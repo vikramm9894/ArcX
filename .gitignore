@@ -43,3 +43,6 @@ example
 # generated native folders
 /ios
 /android
+
+# local tool config
+.claude/settings.local.json

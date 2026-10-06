@@ -15,11 +15,10 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [initializing, setInitializing] = useState(true);
+  const [initializing, setInitializing] = useState(isSupabaseConfigured);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      setInitializing(false);
       return;
     }
 

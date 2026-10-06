@@ -36,7 +36,7 @@ export default function WelcomeScreen() {
           Winter<Text variant="display" weight="heavy" color="primary">ARC</Text>
         </Text>
         <Text variant="body" color="textSecondary" align="center" style={styles.tagline}>
-          One season. One promise. A version of you the spring won't recognise.
+          One season. One promise. A version of you the spring won&apos;t recognise.
         </Text>
       </View>
 
