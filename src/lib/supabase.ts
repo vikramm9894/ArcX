@@ -1,11 +1,32 @@
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppState } from 'react-native';
-import { createClient } from '@supabase/supabase-js';
+import { AppState, Platform } from 'react-native';
+import { createClient, type SupportedStorage } from '@supabase/supabase-js';
 import { env, isSupabaseConfigured } from './env';
 
+const authStorage: SupportedStorage = {
+  getItem: (key: string) => {
+    if (Platform.OS === 'web' && typeof window === 'undefined') {
+      return null;
+    }
+    return AsyncStorage.getItem(key);
+  },
+  setItem: (key: string, value: string) => {
+    if (Platform.OS === 'web' && typeof window === 'undefined') {
+      return;
+    }
+    return AsyncStorage.setItem(key, value);
+  },
+  removeItem: (key: string) => {
+    if (Platform.OS === 'web' && typeof window === 'undefined') {
+      return;
+    }
+    return AsyncStorage.removeItem(key);
+  },
+};
+
 /**
- * Supabase client configured for React Native:
+ * Supabase client configured for React Native & Web:
  *  - AsyncStorage persists the session across app launches
  *  - autoRefreshToken keeps the JWT fresh
  *  - detectSessionInUrl is off (no browser redirect flow on native)
@@ -19,7 +40,7 @@ export const supabase = createClient(
   isSupabaseConfigured ? env.supabaseAnonKey : 'placeholder-anon-key',
   {
     auth: {
-      storage: AsyncStorage,
+      storage: authStorage,
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,
@@ -31,13 +52,15 @@ export const supabase = createClient(
  * Supabase recommends pausing token auto-refresh while the app is backgrounded
  * and resuming on foreground. Registered once at module load.
  */
-AppState.addEventListener('change', (state) => {
-  if (!isSupabaseConfigured) return;
-  if (state === 'active') {
-    supabase.auth.startAutoRefresh();
-  } else {
-    supabase.auth.stopAutoRefresh();
-  }
-});
+if (Platform.OS !== 'web' || typeof window !== 'undefined') {
+  AppState.addEventListener('change', (state) => {
+    if (!isSupabaseConfigured) return;
+    if (state === 'active') {
+      supabase.auth.startAutoRefresh();
+    } else {
+      supabase.auth.stopAutoRefresh();
+    }
+  });
+}
 
 export { isSupabaseConfigured };

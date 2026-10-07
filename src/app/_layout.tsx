@@ -8,8 +8,7 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   useEffect(() => {
-    // Providers restore the session synchronously enough that we can hide the
-    // splash on mount; a future auth-gate can delay this until `initializing`.
+    // Hide splash once the app boots
     SplashScreen.hideAsync();
   }, []);
 
@@ -23,6 +22,10 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" />
+        <Stack.Screen name="sign-in" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="sign-up" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
+        <Stack.Screen name="dashboard" options={{ animation: 'fade' }} />
       </Stack>
     </AppProviders>
   );

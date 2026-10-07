@@ -1,8 +1,9 @@
 import { View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Text, Screen, Button, Card, Badge, Divider } from '@/components/ui';
-import { colors, spacing, radius, fontSize, fontWeight } from '@/theme';
+import { colors, spacing, radius, fontWeight } from '@/theme';
 import { isSupabaseConfigured } from '@/lib/env';
+import { useAuth } from '@/providers';
 
 const PILLARS = [
   {
@@ -27,6 +28,7 @@ const PILLARS = [
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const { session, isOnboarded } = useAuth();
 
   return (
     <Screen scroll edges={['top', 'bottom']}>
@@ -67,15 +69,7 @@ export default function WelcomeScreen() {
             <Text variant="bodySm" color="textPrimary" weight="semibold">
               .env
             </Text>{' '}
-            file in the project root, then restart the dev server:
-          </Text>
-          <View style={styles.code}>
-            <Text variant="caption" color="textSecondary" style={styles.codeText}>
-              EXPO_PUBLIC_SUPABASE_URL=...{'\n'}EXPO_PUBLIC_SUPABASE_ANON_KEY=...
-            </Text>
-          </View>
-          <Text variant="caption" color="textMuted">
-            Full setup steps arrive in Phase 1 (Auth & Onboarding).
+            file in the project root, then restart the dev server.
           </Text>
         </Card>
       )}
@@ -83,25 +77,37 @@ export default function WelcomeScreen() {
       <Divider />
 
       <View style={styles.actions}>
-        <Button
-          title="I'm ready"
-          disabled={!isSupabaseConfigured}
-          onPress={() => router.push('/sign-up')}
-        />
-        <Button
-          title="I already have an account"
-          variant="ghost"
-          onPress={() => router.push('/sign-in')}
-        />
-        {!isSupabaseConfigured && (
-          <Text variant="caption" color="textMuted" align="center">
-            Auth screens unlock once Supabase is connected.
-          </Text>
+        {session ? (
+          <>
+            <Badge
+              label={`LOGGED IN AS ${session.user.email ?? 'USER'}`}
+              tone="success"
+              style={{ alignSelf: 'center' }}
+            />
+            <Button
+              title={isOnboarded ? 'Resume My Arc →' : 'Complete Arc Setup →'}
+              onPress={() => router.push(isOnboarded ? '/dashboard' : '/onboarding')}
+            />
+          </>
+        ) : (
+          <>
+            <Button
+              title="Start My Arc"
+              disabled={!isSupabaseConfigured}
+              onPress={() => router.push('/sign-up')}
+            />
+            <Button
+              title="I already have an account"
+              variant="ghost"
+              disabled={!isSupabaseConfigured}
+              onPress={() => router.push('/sign-in')}
+            />
+          </>
         )}
       </View>
 
       <Text variant="caption" color="textMuted" align="center" style={styles.footer}>
-        Phase 0 · Foundation
+        Phase 1 · Auth &amp; Onboarding
       </Text>
     </Screen>
   );
@@ -123,15 +129,6 @@ const styles = StyleSheet.create({
   pillarBlurb: { lineHeight: 20 },
   notice: { gap: spacing.md, marginBottom: spacing.lg },
   noticeTitle: { marginTop: spacing.xs },
-  code: {
-    backgroundColor: colors.background,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  codeText: { fontFamily: undefined, fontSize: fontSize.xs, lineHeight: 18 },
   actions: { gap: spacing.md, paddingTop: spacing.lg },
   footer: { paddingTop: spacing['2xl'], paddingBottom: spacing.lg, fontWeight: fontWeight.medium },
 });
