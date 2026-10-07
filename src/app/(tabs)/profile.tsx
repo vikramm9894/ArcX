@@ -1,38 +1,39 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { View, StyleSheet, Alert } from 'react-native';
-import { Text, Screen, Card, Button, Badge, Divider, Icon } from '@/components/ui';
+import { Text, Screen, Card, Button, Badge, Divider, Icon, ActivityHeatmap } from '@/components/ui';
 import { colors, spacing, radius } from '@/theme';
 import { useAuth } from '@/providers';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { fetchUserProfile, type ProfileRow } from '@/lib/services/profile.service';
-import { fetchWorkouts } from '@/lib/services/workouts.service';
+import { fetchWorkouts, type WorkoutWithExercises } from '@/lib/services/workouts.service';
 import { fetchUserHabits } from '@/lib/services/habits.service';
-import { fetchJournalEntries } from '@/lib/services/journal.service';
+import { fetchJournalEntries, type JournalEntryRow } from '@/lib/services/journal.service';
+import { computeMilestones, type MilestoneBadge } from '@/lib/services/milestones.service';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, arcData, signOut } = useAuth();
 
   const [profile, setProfile] = useState<ProfileRow | null>(null);
-  const [workoutCount, setWorkoutCount] = useState(0);
+  const [workouts, setWorkouts] = useState<WorkoutWithExercises[]>([]);
   const [habitCount, setHabitCount] = useState(0);
-  const [journalCount, setJournalCount] = useState(0);
+  const [journals, setJournals] = useState<JournalEntryRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const [prof, workouts, habits, journals] = await Promise.all([
+      const [prof, fetchedWorkouts, habits, fetchedJournals] = await Promise.all([
         fetchUserProfile(user.id),
         fetchWorkouts(user.id),
         fetchUserHabits(user.id),
         fetchJournalEntries(user.id),
       ]);
       setProfile(prof);
-      setWorkoutCount(workouts.length);
+      setWorkouts(fetchedWorkouts);
       setHabitCount(habits.length);
-      setJournalCount(journals.length);
+      setJournals(fetchedJournals);
     } finally {
       setRefreshing(false);
     }
@@ -47,6 +48,39 @@ export default function ProfileScreen() {
     loadData();
   }, [loadData]);
 
+  const streak = profile?.current_streak ?? 1;
+  const longestStreak = profile?.longest_streak ?? streak;
+  const duration = profile?.duration_days ?? arcData?.durationDays ?? 90;
+  const goal = profile?.goal ?? arcData?.goal ?? 'Peak Discipline & Athletic Body Transformation';
+  const pillar = profile?.focus_pillar ?? arcData?.focusPillar ?? 'discipline';
+
+  // Aggregate daily activity dates for the 90-day heatmap
+  const activityDates = useMemo(() => {
+    const dates: Record<string, number> = {};
+    for (const w of workouts) {
+      const d = w.workout_date;
+      dates[d] = (dates[d] ?? 0) + 2; // Workouts have weight 2
+    }
+    for (const j of journals) {
+      const d = j.entry_date;
+      dates[d] = (dates[d] ?? 0) + 1; // Reflections have weight 1
+    }
+    return dates;
+  }, [workouts, journals]);
+
+  // Compute Phase 4 milestone achievements
+  const milestones: MilestoneBadge[] = useMemo(() => {
+    return computeMilestones({
+      streak,
+      longestStreak,
+      totalWorkouts: workouts.length,
+      totalHabits: habitCount,
+      totalReflections: journals.length,
+    });
+  }, [streak, longestStreak, workouts.length, habitCount, journals.length]);
+
+  const unlockedCount = milestones.filter((m) => m.isUnlocked).length;
+
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to exit your Winter Arc terminal?', [
       { text: 'Cancel', style: 'cancel' },
@@ -60,12 +94,6 @@ export default function ProfileScreen() {
       },
     ]);
   };
-
-  const streak = profile?.current_streak ?? 1;
-  const longestStreak = profile?.longest_streak ?? streak;
-  const duration = profile?.duration_days ?? arcData?.durationDays ?? 90;
-  const goal = profile?.goal ?? arcData?.goal ?? 'Peak Discipline & Athletic Body Transformation';
-  const pillar = profile?.focus_pillar ?? arcData?.focusPillar ?? 'discipline';
 
   return (
     <Screen
@@ -164,10 +192,87 @@ export default function ProfileScreen() {
         </View>
       </Card>
 
-      {/* Lifetime Telemetry */}
+      {/* Phase 4: 90-Day Activity Heatmap Matrix */}
       <View style={styles.sectionHeader}>
         <Text variant="heading" weight="bold">
-          Lifetime Telemetry
+          Telemetry &amp; Consistency
+        </Text>
+      </View>
+
+      <ActivityHeatmap
+        activityDates={activityDates}
+        startDate={profile?.start_date ?? undefined}
+        totalDays={duration}
+      />
+
+      {/* Phase 4: Milestones & Badges Showcase */}
+      <View style={[styles.sectionHeader, { marginTop: spacing.xl }]}>
+        <View style={styles.sectionTitleRow}>
+          <Text variant="heading" weight="bold">
+            Arc Milestones
+          </Text>
+          <Badge label={`${unlockedCount}/${milestones.length} UNLOCKED`} tone="primary" />
+        </View>
+      </View>
+
+      <View style={styles.milestonesGrid}>
+        {milestones.map((badge) => {
+          return (
+            <Card
+              key={badge.id}
+              style={[
+                styles.badgeCard,
+                badge.isUnlocked && styles.badgeCardUnlocked,
+              ]}
+            >
+              <View style={styles.badgeTopRow}>
+                <Text style={styles.badgeIcon}>{badge.icon}</Text>
+                <View
+                  style={[
+                    styles.statusTag,
+                    badge.isUnlocked ? styles.statusUnlocked : styles.statusLocked,
+                  ]}
+                >
+                  <Text
+                    variant="caption"
+                    weight="bold"
+                    style={{
+                      fontSize: 9,
+                      color: badge.isUnlocked ? colors.primary : colors.textMuted,
+                    }}
+                  >
+                    {badge.isUnlocked ? 'EARNED' : `${badge.progressPercent}%`}
+                  </Text>
+                </View>
+              </View>
+
+              <Text variant="bodySm" weight="bold" style={styles.badgeTitle}>
+                {badge.title}
+              </Text>
+              <Text variant="caption" color="textMuted" style={styles.badgeDesc}>
+                {badge.description}
+              </Text>
+
+              {/* Progress Bar for Locked */}
+              {!badge.isUnlocked && (
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      { width: `${badge.progressPercent}%` },
+                    ]}
+                  />
+                </View>
+              )}
+            </Card>
+          );
+        })}
+      </View>
+
+      {/* Lifetime Telemetry */}
+      <View style={[styles.sectionHeader, { marginTop: spacing.xl }]}>
+        <Text variant="heading" weight="bold">
+          Lifetime Totals
         </Text>
       </View>
 
@@ -175,7 +280,7 @@ export default function ProfileScreen() {
         <Card style={styles.telemetryCard}>
           <Icon name="dumbbell" size={20} color={colors.fitness} />
           <Text variant="heading" weight="heavy" color="fitness">
-            {workoutCount}
+            {workouts.length}
           </Text>
           <Text variant="caption" color="textMuted">
             Workouts Logged
@@ -195,7 +300,7 @@ export default function ProfileScreen() {
         <Card style={styles.telemetryCard}>
           <Icon name="book-open" size={20} color={colors.mindfulness} />
           <Text variant="heading" weight="heavy" color="mindfulness">
-            {journalCount}
+            {journals.length}
           </Text>
           <Text variant="caption" color="textMuted">
             Reflections Filed
@@ -276,6 +381,11 @@ const styles = StyleSheet.create({
   sectionHeader: {
     marginBottom: spacing.md,
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   contractCard: {
     padding: spacing.lg,
     marginBottom: spacing.xl,
@@ -296,6 +406,60 @@ const styles = StyleSheet.create({
   },
   contractGoal: {
     gap: spacing.xs,
+  },
+  milestonesGrid: {
+    gap: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  badgeCard: {
+    padding: spacing.md,
+    gap: spacing.xs,
+    opacity: 0.75,
+  },
+  badgeCardUnlocked: {
+    opacity: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.surfaceElevated,
+  },
+  badgeTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  badgeIcon: {
+    fontSize: 22,
+  },
+  statusTag: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    borderWidth: 1,
+  },
+  statusUnlocked: {
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    borderColor: colors.primary,
+  },
+  statusLocked: {
+    backgroundColor: colors.surface,
+    borderColor: colors.borderSubtle,
+  },
+  badgeTitle: {
+    letterSpacing: -0.2,
+  },
+  badgeDesc: {
+    lineHeight: 16,
+  },
+  progressTrack: {
+    height: 4,
+    backgroundColor: colors.surface,
+    borderRadius: radius.full,
+    overflow: 'hidden',
+    marginTop: spacing.xs,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: radius.full,
   },
   telemetryGrid: {
     flexDirection: 'row',

@@ -3,7 +3,13 @@ import { View, StyleSheet, Pressable, ActivityIndicator, Alert } from 'react-nat
 import { Text, Screen, Card, Button, Input, Badge, Divider, Icon } from '@/components/ui';
 import { colors, spacing, radius } from '@/theme';
 import { useAuth } from '@/providers';
-import { fetchWorkouts, logWorkout, type WorkoutRow } from '@/lib/services/workouts.service';
+import {
+  fetchWorkouts,
+  logWorkout,
+  deleteWorkout,
+  type WorkoutWithExercises,
+  type ExerciseInput,
+} from '@/lib/services/workouts.service';
 
 type IntensityLevel = 'low' | 'medium' | 'high' | 'extreme';
 
@@ -19,7 +25,7 @@ const DURATION_PRESETS = [30, 45, 60, 90];
 export default function WorkoutsScreen() {
   const { user } = useAuth();
 
-  const [workouts, setWorkouts] = useState<WorkoutRow[]>([]);
+  const [workouts, setWorkouts] = useState<WorkoutWithExercises[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isLoggingOpen, setIsLoggingOpen] = useState(false);
@@ -29,6 +35,11 @@ export default function WorkoutsScreen() {
   const [duration, setDuration] = useState(45);
   const [intensity, setIntensity] = useState<IntensityLevel>('high');
   const [notes, setNotes] = useState('');
+  const [exercisesList, setExercisesList] = useState<ExerciseInput[]>([]);
+  const [exName, setExName] = useState('');
+  const [exSets, setExSets] = useState('3');
+  const [exReps, setExReps] = useState('10');
+  const [exWeight, setExWeight] = useState('60');
   const [submitting, setSubmitting] = useState(false);
 
   const loadWorkouts = useCallback(async () => {
@@ -52,6 +63,25 @@ export default function WorkoutsScreen() {
     loadWorkouts();
   }, [loadWorkouts]);
 
+  const handleAddExerciseToForm = () => {
+    if (!exName.trim()) {
+      Alert.alert('Required', 'Please enter an exercise name (e.g. Squat, Bench Press).');
+      return;
+    }
+    const newEx: ExerciseInput = {
+      exercise_name: exName.trim(),
+      sets: parseInt(exSets, 10) || 3,
+      reps: parseInt(exReps, 10) || 10,
+      weight_kg: parseFloat(exWeight) || 0,
+    };
+    setExercisesList((prev) => [...prev, newEx]);
+    setExName('');
+  };
+
+  const handleRemoveExercise = (index: number) => {
+    setExercisesList((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSaveWorkout = async () => {
     if (!title.trim()) {
       Alert.alert('Required', 'Please enter a workout title (e.g. Heavy Legs, Cold Run).');
@@ -61,23 +91,43 @@ export default function WorkoutsScreen() {
 
     try {
       setSubmitting(true);
-      const saved = await logWorkout(user.id, {
-        title: title.trim(),
-        duration_minutes: duration,
-        intensity,
-        notes: notes.trim() || undefined,
-      });
+      const saved = await logWorkout(
+        user.id,
+        {
+          title: title.trim(),
+          duration_minutes: duration,
+          intensity,
+          notes: notes.trim() || undefined,
+        },
+        exercisesList.length > 0 ? exercisesList : undefined,
+      );
 
       setWorkouts((prev) => [saved, ...prev.filter((w) => w.id !== saved.id)]);
       setTitle('');
       setNotes('');
+      setExercisesList([]);
       setIsLoggingOpen(false);
-      Alert.alert('Protocol Logged', 'Workout recorded to your Winter Arc contract.');
+      Alert.alert('Protocol Logged', 'Workout and exercises recorded to your Winter Arc contract.');
     } catch {
       Alert.alert('Error', 'Could not save workout. Please try again.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleDeleteWorkout = (workout: WorkoutWithExercises) => {
+    Alert.alert('Delete Workout', `Delete session "${workout.title}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          if (!user?.id) return;
+          await deleteWorkout(user.id, workout.id);
+          setWorkouts((prev) => prev.filter((w) => w.id !== workout.id));
+        },
+      },
+    ]);
   };
 
   const totalMinutes = workouts.reduce((acc, curr) => acc + (curr.duration_minutes ?? 0), 0);
@@ -147,15 +197,15 @@ export default function WorkoutsScreen() {
             Record Training Session
           </Text>
           <Text variant="caption" color="textMuted">
-            Consistency is built in silence.
+            Track weights, reps, and intense sets.
           </Text>
 
           <View style={styles.fieldGroup}>
             <Text variant="bodySm" weight="semibold">
-              Workout Name
+              Workout Routine
             </Text>
             <Input
-              placeholder="e.g. 5x5 Heavy Squats, 10k Run"
+              placeholder="e.g. Heavy Squats & Calves, 10k Run"
               value={title}
               onChangeText={setTitle}
             />
@@ -216,12 +266,80 @@ export default function WorkoutsScreen() {
             </View>
           </View>
 
+          {/* Exercise Builder Section */}
+          <Divider spacing={spacing.xs} />
+          <View style={styles.fieldGroup}>
+            <Text variant="bodySm" weight="bold" color="fitness">
+              Exercises &amp; Sets (Phase 4 Tracking)
+            </Text>
+
+            {/* List of currently added exercises */}
+            {exercisesList.map((ex, idx) => (
+              <View key={idx} style={styles.exerciseAddedRow}>
+                <View style={styles.exInfo}>
+                  <Text variant="bodySm" weight="semibold">
+                    {ex.exercise_name}
+                  </Text>
+                  <Text variant="caption" color="textMuted">
+                    {ex.sets} sets × {ex.reps} reps · {ex.weight_kg > 0 ? `${ex.weight_kg}kg` : 'Bodyweight'}
+                  </Text>
+                </View>
+                <Pressable onPress={() => handleRemoveExercise(idx)} style={styles.removeExBtn}>
+                  <Icon name="trash" size={14} color={colors.danger} />
+                </Pressable>
+              </View>
+            ))}
+
+            <View style={styles.addExerciseBox}>
+              <Input
+                placeholder="Exercise (e.g. Bench Press)"
+                value={exName}
+                onChangeText={setExName}
+              />
+              <View style={styles.exerciseNumbersRow}>
+                <View style={{ flex: 1 }}>
+                  <Text variant="caption" color="textMuted">Sets</Text>
+                  <Input
+                    placeholder="3"
+                    keyboardType="numeric"
+                    value={exSets}
+                    onChangeText={setExSets}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text variant="caption" color="textMuted">Reps</Text>
+                  <Input
+                    placeholder="10"
+                    keyboardType="numeric"
+                    value={exReps}
+                    onChangeText={setExReps}
+                  />
+                </View>
+                <View style={{ flex: 1.2 }}>
+                  <Text variant="caption" color="textMuted">Weight (kg)</Text>
+                  <Input
+                    placeholder="80"
+                    keyboardType="numeric"
+                    value={exWeight}
+                    onChangeText={setExWeight}
+                  />
+                </View>
+              </View>
+              <Button
+                title="+ Add Movement"
+                variant="secondary"
+                size="sm"
+                onPress={handleAddExerciseToForm}
+              />
+            </View>
+          </View>
+
           <View style={styles.fieldGroup}>
             <Text variant="bodySm" weight="semibold">
               Notes &amp; Personal Records
             </Text>
             <Input
-              placeholder="Sets, weights, how the session felt..."
+              placeholder="How the session felt, PR numbers..."
               value={notes}
               onChangeText={setNotes}
               multiline
@@ -271,29 +389,53 @@ export default function WorkoutsScreen() {
                     {w.workout_date} · {w.duration_minutes ?? 45} mins
                   </Text>
                 </View>
-                <View
-                  style={[
-                    styles.intensityBadge,
-                    {
-                      backgroundColor:
-                        INTENSITY_COLORS[(w.intensity as IntensityLevel) ?? 'high'] + '22',
-                      borderColor:
-                        INTENSITY_COLORS[(w.intensity as IntensityLevel) ?? 'high'],
-                    },
-                  ]}
-                >
-                  <Text
-                    variant="caption"
-                    weight="bold"
-                    style={{
-                      color: INTENSITY_COLORS[(w.intensity as IntensityLevel) ?? 'high'],
-                      fontSize: 10,
-                    }}
+                <View style={styles.badgeActionsRow}>
+                  <View
+                    style={[
+                      styles.intensityBadge,
+                      {
+                        backgroundColor:
+                          INTENSITY_COLORS[(w.intensity as IntensityLevel) ?? 'high'] + '22',
+                        borderColor:
+                          INTENSITY_COLORS[(w.intensity as IntensityLevel) ?? 'high'],
+                      },
+                    ]}
                   >
-                    {w.intensity?.toUpperCase() ?? 'HIGH'}
-                  </Text>
+                    <Text
+                      variant="caption"
+                      weight="bold"
+                      style={{
+                        color: INTENSITY_COLORS[(w.intensity as IntensityLevel) ?? 'high'],
+                        fontSize: 10,
+                      }}
+                    >
+                      {w.intensity?.toUpperCase() ?? 'HIGH'}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => handleDeleteWorkout(w)}
+                    style={styles.deleteWorkoutBtn}
+                  >
+                    <Icon name="trash" size={14} color={colors.textMuted} />
+                  </Pressable>
                 </View>
               </View>
+
+              {/* Exercises Chips in History */}
+              {w.exercises && w.exercises.length > 0 && (
+                <View style={styles.exercisesGrid}>
+                  {w.exercises.map((ex, exIdx) => (
+                    <View key={exIdx} style={styles.exChip}>
+                      <Text variant="caption" weight="bold" color="fitness">
+                        {ex.exercise_name}
+                      </Text>
+                      <Text variant="caption" color="textSecondary" style={{ fontSize: 11 }}>
+                        {ex.sets}x{ex.reps} {ex.weight_kg > 0 ? `@ ${ex.weight_kg}kg` : ''}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
 
               {w.notes && (
                 <>
@@ -376,6 +518,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderSubtle,
   },
+  exerciseAddedRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+  },
+  exInfo: {
+    flex: 1,
+  },
+  removeExBtn: {
+    padding: spacing.xs,
+  },
+  addExerciseBox: {
+    padding: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    gap: spacing.xs,
+  },
+  exerciseNumbersRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -399,11 +569,34 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
+  badgeActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   intensityBadge: {
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radius.sm,
     borderWidth: 1,
+  },
+  deleteWorkoutBtn: {
+    padding: 2,
+  },
+  exercisesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  exChip: {
+    backgroundColor: colors.surfaceElevated,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    gap: 1,
   },
   workoutNotes: {
     fontStyle: 'italic',

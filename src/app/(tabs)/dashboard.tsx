@@ -13,6 +13,7 @@ import {
 import { fetchUserProfile, type ProfileRow } from '@/lib/services/profile.service';
 import { fetchWorkouts, type WorkoutRow } from '@/lib/services/workouts.service';
 import { fetchJournalEntries, type JournalEntryRow } from '@/lib/services/journal.service';
+import { computeMilestones } from '@/lib/services/milestones.service';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -95,6 +96,14 @@ export default function DashboardScreen() {
   const totalDays = profile?.duration_days ?? arcData?.durationDays ?? 90;
   const goalTitle = profile?.goal ?? arcData?.goal ?? 'Peak Discipline & Body Transformation';
 
+  const nextMilestone = computeMilestones({
+    streak: currentStreak,
+    longestStreak: currentStreak,
+    totalWorkouts: recentWorkouts.length,
+    totalHabits: habitsList.length,
+    totalReflections: recentJournals.length,
+  }).find((m) => !m.isUnlocked);
+
   return (
     <Screen
       scroll
@@ -152,6 +161,17 @@ export default function DashboardScreen() {
             {goalTitle}
           </Text>
         </View>
+
+        {nextMilestone && (
+          <View style={styles.nextMilestoneRow}>
+            <Text variant="caption" color="textMuted">
+              NEXT UNLOCK:
+            </Text>
+            <Text variant="caption" weight="bold" color="primary">
+              {nextMilestone.icon} {nextMilestone.title} ({nextMilestone.progressPercent}%)
+            </Text>
+          </View>
+        )}
       </Card>
 
       {/* Today's Protocol Checklist */}
@@ -417,5 +437,13 @@ const styles = StyleSheet.create({
   insightText: {
     fontStyle: 'italic',
     lineHeight: 18,
+  },
+  nextMilestoneRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSubtle,
   },
 });
