@@ -1,7 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
-import { Text, Screen, Card, Badge, Divider, Icon } from '@/components/ui';
+import {
+  Text,
+  Screen,
+  Card,
+  Badge,
+  Divider,
+  Icon,
+  ProtocolTimerModal,
+  ShareContractModal,
+  type TimerMode,
+} from '@/components/ui';
 import { colors, spacing, radius } from '@/theme';
 import { useAuth } from '@/providers';
 import {
@@ -14,6 +24,7 @@ import { fetchUserProfile, type ProfileRow } from '@/lib/services/profile.servic
 import { fetchWorkouts, type WorkoutRow } from '@/lib/services/workouts.service';
 import { fetchJournalEntries, type JournalEntryRow } from '@/lib/services/journal.service';
 import { computeMilestones } from '@/lib/services/milestones.service';
+import { getDailyCreed, getRandomCreed, type StoicQuote } from '@/lib/services/quotes.service';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -26,6 +37,12 @@ export default function DashboardScreen() {
   const [recentJournals, setRecentJournals] = useState<JournalEntryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Phase 5: Timer & Share Modals
+  const [timerModalVisible, setTimerModalVisible] = useState(false);
+  const [activeTimerMode, setActiveTimerMode] = useState<TimerMode>('cold');
+  const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [dailyCreed, setDailyCreed] = useState<StoicQuote>(() => getDailyCreed());
 
   const loadDashboardData = useCallback(async () => {
     if (!user?.id) return;
@@ -294,18 +311,108 @@ export default function DashboardScreen() {
         </Card>
       </View>
 
-      {/* Quick Insights Banner */}
-      <Card style={styles.insightBanner}>
-        <View style={styles.insightHeader}>
-          <Icon name="shield" size={16} color={colors.primary} />
-          <Text variant="bodySm" weight="bold" color="primary">
-            WINTER ARC DISCIPLINE
+      {/* Protocol Execution Tools */}
+      <View style={styles.sectionHeader}>
+        <Text variant="heading" weight="bold">
+          Protocol Tools
+        </Text>
+        <Text variant="caption" color="textMuted">
+          Timers &amp; Telemetry
+        </Text>
+      </View>
+
+      <View style={styles.toolsRow}>
+        <Card
+          style={styles.toolCard}
+          onPress={() => {
+            setActiveTimerMode('cold');
+            setTimerModalVisible(true);
+          }}
+        >
+          <Text style={{ fontSize: 22 }}>🥶</Text>
+          <Text variant="bodySm" weight="bold">
+            Cold Shower
           </Text>
+          <Text variant="caption" color="primary">
+            2:00 Timer →
+          </Text>
+        </Card>
+
+        <Card
+          style={styles.toolCard}
+          onPress={() => {
+            setActiveTimerMode('rest');
+            setTimerModalVisible(true);
+          }}
+        >
+          <Text style={{ fontSize: 22 }}>⏱️</Text>
+          <Text variant="bodySm" weight="bold">
+            Gym Rest
+          </Text>
+          <Text variant="caption" color="fitness">
+            60s Rest →
+          </Text>
+        </Card>
+
+        <Card
+          style={styles.toolCard}
+          onPress={() => setShareModalVisible(true)}
+        >
+          <Text style={{ fontSize: 22 }}>📄</Text>
+          <Text variant="bodySm" weight="bold">
+            Passport
+          </Text>
+          <Text variant="caption" color="textMuted">
+            Export Card →
+          </Text>
+        </Card>
+      </View>
+
+      {/* Daily Stoic Creed Engine */}
+      <Card style={styles.creedBanner}>
+        <View style={styles.creedTopRow}>
+          <View style={styles.creedBadgeRow}>
+            <Icon name="shield" size={14} color={colors.primary} />
+            <Text variant="caption" weight="heavy" color="primary">
+              DAILY STOIC CREED
+            </Text>
+          </View>
+          <Pressable
+            style={styles.shuffleBtn}
+            onPress={() => setDailyCreed(getRandomCreed())}
+          >
+            <Text variant="caption" color="primary" weight="bold">
+              🔀 Shuffle
+            </Text>
+          </Pressable>
         </View>
-        <Text variant="caption" color="textSecondary" style={styles.insightText}>
-          &quot;The secret of change is to focus all of your energy not on fighting the old, but on building the new.&quot;
+
+        <Text variant="bodySm" color="textPrimary" style={styles.creedQuote}>
+          &quot;{dailyCreed.quote}&quot;
+        </Text>
+        <Text variant="caption" color="textMuted" style={styles.creedAuthor}>
+          — {dailyCreed.author}
         </Text>
       </Card>
+
+      {/* Phase 5 Modals */}
+      <ProtocolTimerModal
+        visible={timerModalVisible}
+        onClose={() => setTimerModalVisible(false)}
+        initialMode={activeTimerMode}
+      />
+
+      <ShareContractModal
+        visible={shareModalVisible}
+        onClose={() => setShareModalVisible(false)}
+        userName={profile?.full_name ?? user?.email ?? 'Champion'}
+        currentStreak={currentStreak}
+        totalDays={totalDays}
+        goal={goalTitle}
+        workoutsCount={recentWorkouts.length}
+        reflectionsCount={recentJournals.length}
+        unlockedBadgesCount={Math.min(9, Math.max(1, currentStreak))}
+      />
     </Screen>
   );
 }
@@ -445,5 +552,49 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
     borderTopWidth: 1,
     borderTopColor: colors.borderSubtle,
+  },
+  toolsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  toolCard: {
+    flex: 1,
+    padding: spacing.md,
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  creedBanner: {
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+    backgroundColor: colors.surfaceElevated,
+    borderColor: colors.borderSubtle,
+    gap: spacing.xs,
+  },
+  creedTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  creedBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  shuffleBtn: {
+    paddingVertical: 2,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+  },
+  creedQuote: {
+    fontStyle: 'italic',
+    lineHeight: 20,
+  },
+  creedAuthor: {
+    marginTop: 2,
   },
 });

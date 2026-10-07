@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, Pressable, ActivityIndicator, Alert } from 'react-native';
-import { Text, Screen, Card, Button, Input, Badge, Divider, Icon } from '@/components/ui';
+import { Text, Screen, Card, Button, Input, Badge, Divider, Icon, ProtocolTimerModal } from '@/components/ui';
 import { colors, spacing, radius } from '@/theme';
 import { useAuth } from '@/providers';
 import {
@@ -29,6 +29,7 @@ export default function WorkoutsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isLoggingOpen, setIsLoggingOpen] = useState(false);
+  const [restTimerVisible, setRestTimerVisible] = useState(false);
 
   // Form states
   const [title, setTitle] = useState('');
@@ -150,12 +151,20 @@ export default function WorkoutsScreen() {
             Winter<Text variant="title" weight="heavy" color="fitness">FITNESS</Text>
           </Text>
         </View>
-        <Button
-          title={isLoggingOpen ? 'Close' : '+ Log'}
-          variant={isLoggingOpen ? 'ghost' : 'primary'}
-          size="sm"
-          onPress={() => setIsLoggingOpen((prev) => !prev)}
-        />
+        <View style={styles.headerBtnGroup}>
+          <Button
+            title="⏱️ Rest"
+            variant="secondary"
+            size="sm"
+            onPress={() => setRestTimerVisible(true)}
+          />
+          <Button
+            title={isLoggingOpen ? 'Close' : '+ Log'}
+            variant={isLoggingOpen ? 'ghost' : 'primary'}
+            size="sm"
+            onPress={() => setIsLoggingOpen((prev) => !prev)}
+          />
+        </View>
       </View>
 
       {/* Aggregate Stats Card */}
@@ -449,6 +458,13 @@ export default function WorkoutsScreen() {
           ))}
         </View>
       )}
+
+      {/* Phase 5: Rest Timer Modal */}
+      <ProtocolTimerModal
+        visible={restTimerVisible}
+        onClose={() => setRestTimerVisible(false)}
+        initialMode="rest"
+      />
     </Screen>
   );
 }
@@ -460,6 +476,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
+  },
+  headerBtnGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   statsCard: {
     padding: spacing.lg,

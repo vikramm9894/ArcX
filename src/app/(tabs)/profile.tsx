@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { View, StyleSheet, Alert } from 'react-native';
-import { Text, Screen, Card, Button, Badge, Divider, Icon, ActivityHeatmap } from '@/components/ui';
+import { Text, Screen, Card, Button, Badge, Divider, Icon, ActivityHeatmap, ShareContractModal } from '@/components/ui';
 import { colors, spacing, radius } from '@/theme';
 import { useAuth } from '@/providers';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -20,6 +20,7 @@ export default function ProfileScreen() {
   const [habitCount, setHabitCount] = useState(0);
   const [journals, setJournals] = useState<JournalEntryRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [shareModalVisible, setShareModalVisible] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!user?.id) return;
@@ -317,7 +318,12 @@ export default function ProfileScreen() {
 
       <Card style={styles.actionsCard}>
         <Button
-          title="⚙️ Reconfigure Arc Targets & Habits"
+          title="📄 View &amp; Export Arc Passport"
+          variant="primary"
+          onPress={() => setShareModalVisible(true)}
+        />
+        <Button
+          title="⚙️ Reconfigure Arc Targets &amp; Habits"
           variant="secondary"
           onPress={() => router.push('/onboarding')}
         />
@@ -339,6 +345,19 @@ export default function ProfileScreen() {
           No excuses, no pauses, no compromise.&quot;
         </Text>
       </Card>
+
+      {/* Phase 5: Share Contract Modal */}
+      <ShareContractModal
+        visible={shareModalVisible}
+        onClose={() => setShareModalVisible(false)}
+        userName={profile?.full_name ?? user?.email ?? 'Champion'}
+        currentStreak={streak}
+        totalDays={duration}
+        goal={goal}
+        workoutsCount={workouts.length}
+        reflectionsCount={journals.length}
+        unlockedBadgesCount={unlockedCount}
+      />
     </Screen>
   );
 }
