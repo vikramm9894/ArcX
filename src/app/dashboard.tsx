@@ -1,37 +1,91 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'expo-router';
-import { View, StyleSheet, Pressable } from 'react-native';
+import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { Text, Screen, Button, Card, Badge, Divider } from '@/components/ui';
 import { colors, spacing, radius, fontWeight } from '@/theme';
 import { useAuth } from '@/providers';
+import {
+  fetchUserHabits,
+  fetchTodayCompletedHabitIds,
+  toggleHabitLog,
+  type HabitRow,
+} from '@/lib/services/habits.service';
+import { fetchUserProfile, type ProfileRow } from '@/lib/services/profile.service';
 
 export default function DashboardScreen() {
   const router = useRouter();
   const { user, arcData, signOut } = useAuth();
 
-  // Local state for checking off habits today
-  const [completedHabits, setCompletedHabits] = useState<Record<string, boolean>>({});
+  const [habitsList, setHabitsList] = useState<HabitRow[]>([]);
+  const [completedIds, setCompletedIds] = useState<string[]>([]);
+  const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const habits = arcData?.habits ?? [
-    '🧊 Cold shower every morning',
-    '💧 Drink 3.5L of water',
-    '🏋️ 45-min workout session',
-  ];
+  const loadDashboardData = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      setLoading(true);
+      const [fetchedProfile, fetchedHabits, todayCompleted] = await Promise.all([
+        fetchUserProfile(user.id),
+        fetchUserHabits(user.id),
+        fetchTodayCompletedHabitIds(user.id),
+      ]);
 
-  const toggleHabit = (habit: string) => {
-    setCompletedHabits((prev) => ({
-      ...prev,
-      [habit]: !prev[habit],
-    }));
+      setProfile(fetchedProfile);
+      setCompletedIds(todayCompleted);
+
+      if (fetchedHabits && fetchedHabits.length > 0) {
+        setHabitsList(fetchedHabits);
+      } else if (arcData?.habits) {
+        // Fallback to onboarding arc habits
+        setHabitsList(
+          arcData.habits.map((h, i) => ({
+            id: `temp_${i}`,
+            user_id: user.id,
+            title: h,
+            pillar: arcData.focusPillar,
+            icon: '⚡',
+            target_frequency: 'daily',
+            is_archived: false,
+            order_index: i,
+            created_at: new Date().toISOString(),
+          })),
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, arcData]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  const handleToggleHabit = async (habitId: string) => {
+    if (!user?.id) return;
+    const isCurrentlyDone = completedIds.includes(habitId);
+    const nextState = !isCurrentlyDone;
+
+    // Optimistic UI update
+    setCompletedIds((prev) =>
+      nextState ? [...prev, habitId] : prev.filter((id) => id !== habitId),
+    );
+
+    await toggleHabitLog(user.id, habitId, nextState);
   };
 
-  const completedCount = habits.filter((h) => completedHabits[h]).length;
-  const progressPercent = habits.length > 0 ? Math.round((completedCount / habits.length) * 100) : 0;
+  const completedCount = habitsList.filter((h) => completedIds.includes(h.id)).length;
+  const progressPercent =
+    habitsList.length > 0 ? Math.round((completedCount / habitsList.length) * 100) : 0;
 
   const handleSignOut = async () => {
     await signOut();
     router.replace('/');
   };
+
+  const currentStreak = profile?.current_streak ?? 1;
+  const totalDays = profile?.duration_days ?? arcData?.durationDays ?? 90;
+  const goalTitle = profile?.goal ?? arcData?.goal ?? 'Peak Discipline & Body Transformation';
 
   return (
     <Screen scroll edges={['top', 'bottom']}>
@@ -58,12 +112,12 @@ export default function DashboardScreen() {
       <Card elevated style={styles.streakCard}>
         <View style={styles.streakRow}>
           <View>
-            <Badge label="DAY 1 OF 90" tone="primary" />
+            <Badge label={`DAY ${currentStreak} OF ${totalDays}`} tone="primary" />
             <Text variant="display" weight="heavy" style={styles.streakCount}>
-              Day 01
+              Day {currentStreak.toString().padStart(2, '0')}
             </Text>
             <Text variant="caption" color="textSecondary">
-              Streak: 1 Day 🔥 · 89 Days Remaining
+              Streak: {currentStreak} Day 🔥 · {totalDays - currentStreak} Days Remaining
             </Text>
           </View>
           <View style={styles.progressCircle}>
@@ -83,7 +137,7 @@ export default function DashboardScreen() {
             ACTIVE MISSION:
           </Text>
           <Text variant="bodySm" weight="semibold">
-            {arcData?.goal ?? 'Total Transformation & Peak Discipline'}
+            {goalTitle}
           </Text>
         </View>
       </Card>
@@ -94,18 +148,21 @@ export default function DashboardScreen() {
           Today&apos;s Protocol
         </Text>
         <Badge
-          label={`${completedCount}/${habits.length} COMPLETED`}
+          label={`${completedCount}/${habitsList.length} COMPLETED`}
           tone={progressPercent === 100 ? 'success' : 'neutral'}
         />
       </View>
 
       <View style={styles.habitsList}>
-        {habits.map((habit) => {
-          const isDone = !!completedHabits[habit];
+        {loading && habitsList.length === 0 ? (
+          <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} />
+        ) : (
+          habitsList.map((habit) => {
+          const isDone = completedIds.includes(habit.id);
           return (
             <Card
-              key={habit}
-              onPress={() => toggleHabit(habit)}
+              key={habit.id}
+              onPress={() => handleToggleHabit(habit.id)}
               style={[
                 styles.habitCard,
                 isDone && styles.habitCardDone,
@@ -123,12 +180,12 @@ export default function DashboardScreen() {
                     isDone && styles.habitLabelDone,
                   ]}
                 >
-                  {habit}
+                  {habit.title}
                 </Text>
               </View>
             </Card>
           );
-        })}
+        }))}
       </View>
 
       {/* Pillars Quick View */}
@@ -137,7 +194,7 @@ export default function DashboardScreen() {
           Arc Pillars
         </Text>
         <Text variant="caption" color="textMuted">
-          Phase 2 Integration
+          Connected Backend
         </Text>
       </View>
 
@@ -148,7 +205,7 @@ export default function DashboardScreen() {
             Fitness
           </Text>
           <Text variant="caption" color="textMuted">
-            Workout ready
+            Workouts Table
           </Text>
         </Card>
 
@@ -158,7 +215,7 @@ export default function DashboardScreen() {
             Habits
           </Text>
           <Text variant="caption" color="textMuted">
-            {progressPercent}% locked
+            {progressPercent}% Logged
           </Text>
         </Card>
 
@@ -168,7 +225,7 @@ export default function DashboardScreen() {
             Journal
           </Text>
           <Text variant="caption" color="textMuted">
-            Evening prompt
+            Entries Table
           </Text>
         </Card>
       </View>
@@ -177,7 +234,7 @@ export default function DashboardScreen() {
       <View style={styles.footer}>
         <Pressable onPress={() => router.push('/onboarding')}>
           <Text variant="caption" color="textMuted" align="center">
-            ⚙️ Reconfigure Arc Targets & Habits
+            ⚙️ Reconfigure Arc Targets &amp; Habits
           </Text>
         </Pressable>
       </View>

@@ -3,6 +3,8 @@ import type { Session, User } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import type { ArcOnboardingData } from '@/lib/types';
+import { syncOnboardingProfile } from '@/lib/services/profile.service';
+import { seedInitialHabits } from '@/lib/services/habits.service';
 
 interface AuthContextValue {
   /** Current Supabase session, or null when signed out. */
@@ -103,6 +105,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           `${ONBOARDING_STORAGE_KEY_PREFIX}${session.user.id}`,
           JSON.stringify(data),
         );
+
+        // Sync to Supabase profile and seed habits
+        try {
+          await syncOnboardingProfile(session.user.id, session.user.email ?? null, data);
+          await seedInitialHabits(session.user.id, data.habits, data.focusPillar);
+        } catch (err) {
+          console.warn('Could not sync profile/habits in completeOnboarding', err);
+        }
 
         // Also persist to Supabase user metadata
         try {

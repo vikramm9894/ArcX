@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, Platform } from 'react-native';
 import { createClient, type SupportedStorage } from '@supabase/supabase-js';
 import { env, isSupabaseConfigured } from './env';
+import type { Database } from './database.types';
 
 const authStorage: SupportedStorage = {
   getItem: (key: string) => {
@@ -35,7 +36,7 @@ const authStorage: SupportedStorage = {
  * placeholder so imports never throw; callers must check `isSupabaseConfigured`
  * before relying on network calls.
  */
-export const supabase = createClient(
+export const supabase = createClient<Database>(
   isSupabaseConfigured ? env.supabaseUrl : 'https://placeholder.supabase.co',
   isSupabaseConfigured ? env.supabaseAnonKey : 'placeholder-anon-key',
   {
