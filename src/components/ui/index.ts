@@ -9,3 +9,5 @@ export { Icon, type IconProps, type IconName } from './Icon';
 export { ActivityHeatmap, type ActivityHeatmapProps } from './ActivityHeatmap';
 export { ProtocolTimerModal, type ProtocolTimerModalProps, type TimerMode } from './ProtocolTimerModal';
 export { ShareContractModal, type ShareContractModalProps } from './ShareContractModal';
+export { PillarBalanceCard, type PillarBalanceCardProps } from './PillarBalanceCard';
+export { BackupModal, type BackupModalProps } from './BackupModal';

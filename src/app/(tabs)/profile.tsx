@@ -1,15 +1,28 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { View, StyleSheet, Alert } from 'react-native';
-import { Text, Screen, Card, Button, Badge, Divider, Icon, ActivityHeatmap, ShareContractModal } from '@/components/ui';
+import {
+  Text,
+  Screen,
+  Card,
+  Button,
+  Badge,
+  Divider,
+  Icon,
+  ActivityHeatmap,
+  ShareContractModal,
+  PillarBalanceCard,
+  BackupModal,
+} from '@/components/ui';
 import { colors, spacing, radius } from '@/theme';
 import { useAuth } from '@/providers';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { fetchUserProfile, type ProfileRow } from '@/lib/services/profile.service';
 import { fetchWorkouts, type WorkoutWithExercises } from '@/lib/services/workouts.service';
-import { fetchUserHabits } from '@/lib/services/habits.service';
+import { fetchUserHabits, fetchTodayCompletedHabitIds } from '@/lib/services/habits.service';
 import { fetchJournalEntries, type JournalEntryRow } from '@/lib/services/journal.service';
 import { computeMilestones, type MilestoneBadge } from '@/lib/services/milestones.service';
+import { computePillarAnalytics } from '@/lib/services/analytics.service';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -18,22 +31,26 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [workouts, setWorkouts] = useState<WorkoutWithExercises[]>([]);
   const [habitCount, setHabitCount] = useState(0);
+  const [completedHabitCount, setCompletedHabitCount] = useState(0);
   const [journals, setJournals] = useState<JournalEntryRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [backupModalVisible, setBackupModalVisible] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const [prof, fetchedWorkouts, habits, fetchedJournals] = await Promise.all([
+      const [prof, fetchedWorkouts, habits, fetchedJournals, todayHabitIds] = await Promise.all([
         fetchUserProfile(user.id),
         fetchWorkouts(user.id),
         fetchUserHabits(user.id),
         fetchJournalEntries(user.id),
+        fetchTodayCompletedHabitIds(user.id),
       ]);
       setProfile(prof);
       setWorkouts(fetchedWorkouts);
       setHabitCount(habits.length);
+      setCompletedHabitCount(todayHabitIds.length);
       setJournals(fetchedJournals);
     } finally {
       setRefreshing(false);
@@ -81,6 +98,17 @@ export default function ProfileScreen() {
   }, [streak, longestStreak, workouts.length, habitCount, journals.length]);
 
   const unlockedCount = milestones.filter((m) => m.isUnlocked).length;
+
+  // Phase 6: Winter Arc Pillar Analytics & Discipline Index
+  const habitAdherence = habitCount > 0 ? Math.round((completedHabitCount / habitCount) * 100) : 0;
+  const pillarAnalytics = useMemo(() => {
+    return computePillarAnalytics({
+      habitAdherencePercent: habitAdherence,
+      totalWorkouts: workouts.length,
+      totalReflections: journals.length,
+      currentStreak: streak,
+    });
+  }, [habitAdherence, workouts.length, journals.length, streak]);
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to exit your Winter Arc terminal?', [
@@ -193,8 +221,17 @@ export default function ProfileScreen() {
         </View>
       </Card>
 
-      {/* Phase 4: 90-Day Activity Heatmap Matrix */}
+      {/* Phase 6: Winter Arc Discipline Index & Three Pillars Balance */}
       <View style={styles.sectionHeader}>
+        <Text variant="heading" weight="bold">
+          Discipline Index &amp; Pillars
+        </Text>
+      </View>
+
+      <PillarBalanceCard analytics={pillarAnalytics} />
+
+      {/* Phase 4: 90-Day Activity Heatmap Matrix */}
+      <View style={[styles.sectionHeader, { marginTop: spacing.xl }]}>
         <Text variant="heading" weight="bold">
           Telemetry &amp; Consistency
         </Text>
@@ -323,6 +360,11 @@ export default function ProfileScreen() {
           onPress={() => setShareModalVisible(true)}
         />
         <Button
+          title="💾 Arc Data Backup &amp; Restore"
+          variant="secondary"
+          onPress={() => setBackupModalVisible(true)}
+        />
+        <Button
           title="⚙️ Reconfigure Arc Targets &amp; Habits"
           variant="secondary"
           onPress={() => router.push('/onboarding')}
@@ -357,6 +399,14 @@ export default function ProfileScreen() {
         workoutsCount={workouts.length}
         reflectionsCount={journals.length}
         unlockedBadgesCount={unlockedCount}
+      />
+
+      {/* Phase 6: Arc Database Backup & Restore Modal */}
+      <BackupModal
+        visible={backupModalVisible}
+        onClose={() => setBackupModalVisible(false)}
+        userId={user?.id ?? 'guest'}
+        onDataRestored={loadData}
       />
     </Screen>
   );

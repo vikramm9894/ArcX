@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'expo-router';
 import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import {
@@ -25,6 +25,7 @@ import { fetchWorkouts, type WorkoutRow } from '@/lib/services/workouts.service'
 import { fetchJournalEntries, type JournalEntryRow } from '@/lib/services/journal.service';
 import { computeMilestones } from '@/lib/services/milestones.service';
 import { getDailyCreed, getRandomCreed, type StoicQuote } from '@/lib/services/quotes.service';
+import { computePillarAnalytics } from '@/lib/services/analytics.service';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -113,6 +114,15 @@ export default function DashboardScreen() {
   const totalDays = profile?.duration_days ?? arcData?.durationDays ?? 90;
   const goalTitle = profile?.goal ?? arcData?.goal ?? 'Peak Discipline & Body Transformation';
 
+  const pillarAnalytics = useMemo(() => {
+    return computePillarAnalytics({
+      habitAdherencePercent: progressPercent,
+      totalWorkouts: recentWorkouts.length,
+      totalReflections: recentJournals.length,
+      currentStreak: currentStreak,
+    });
+  }, [progressPercent, recentWorkouts.length, recentJournals.length, currentStreak]);
+
   const nextMilestone = computeMilestones({
     streak: currentStreak,
     longestStreak: currentStreak,
@@ -142,7 +152,10 @@ export default function DashboardScreen() {
           style={styles.profileBadgeBtn}
           onPress={() => router.push('/profile' as any)}
         >
-          <Badge label={`STREAK ${currentStreak}🔥`} tone="primary" />
+          <View style={styles.headerBadgesRow}>
+            <Badge label={`INDEX ${pillarAnalytics.disciplineIndex}`} tone="primary" />
+            <Badge label={`STREAK ${currentStreak}🔥`} tone="warning" />
+          </View>
         </Pressable>
       </View>
 
@@ -427,6 +440,11 @@ const styles = StyleSheet.create({
   },
   profileBadgeBtn: {
     padding: spacing.xs,
+  },
+  headerBadgesRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    alignItems: 'center',
   },
   streakCard: {
     padding: spacing.xl,
