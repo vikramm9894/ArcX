@@ -182,3 +182,70 @@ export async function seedInitialHabits(
 
   return newHabits;
 }
+
+/**
+ * Create a new custom habit
+ */
+export async function createHabit(
+  userId: string,
+  title: string,
+  pillar: Pillar = 'discipline',
+  targetFrequency = 'daily',
+): Promise<HabitRow> {
+  const existing = await fetchUserHabits(userId);
+  const newHabit: HabitRow = {
+    id: `local_habit_${Date.now()}`,
+    user_id: userId,
+    title,
+    pillar,
+    icon: pillar === 'fitness' ? '⚡' : pillar === 'mindfulness' ? '🧘' : '🎯',
+    target_frequency: targetFrequency,
+    is_archived: false,
+    order_index: existing.length,
+    created_at: new Date().toISOString(),
+  };
+
+  const updated = [...existing, newHabit];
+  await AsyncStorage.setItem(`${HABITS_STORAGE_KEY_PREFIX}${userId}`, JSON.stringify(updated));
+
+  if (isSupabaseConfigured) {
+    try {
+      const { data } = await supabase
+        .from('habits')
+        .insert({
+          user_id: userId,
+          title,
+          pillar,
+          target_frequency: targetFrequency,
+          order_index: existing.length,
+        })
+        .select()
+        .single();
+
+      if (data) return data;
+    } catch {
+      // Local copy saved
+    }
+  }
+
+  return newHabit;
+}
+
+/**
+ * Delete / remove a habit
+ */
+export async function deleteHabit(userId: string, habitId: string): Promise<boolean> {
+  const existing = await fetchUserHabits(userId);
+  const updated = existing.filter((h) => h.id !== habitId);
+  await AsyncStorage.setItem(`${HABITS_STORAGE_KEY_PREFIX}${userId}`, JSON.stringify(updated));
+
+  if (isSupabaseConfigured) {
+    try {
+      await supabase.from('habits').delete().eq('user_id', userId).eq('id', habitId);
+    } catch {
+      // Local copy updated
+    }
+  }
+
+  return true;
+}

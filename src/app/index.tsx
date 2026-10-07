@@ -107,7 +107,7 @@ export default function WelcomeScreen() {
       </View>
 
       <Text variant="caption" color="textMuted" align="center" style={styles.footer}>
-        Phase 1 · Auth &amp; Onboarding
+        Phase 3 · Three Pillars &amp; Protocol Terminal
       </Text>
     </Screen>
   );

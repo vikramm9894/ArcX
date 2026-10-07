@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
-import { Text, Screen, Button, Card, Badge, Divider } from '@/components/ui';
-import { colors, spacing, radius, fontWeight } from '@/theme';
+import { Text, Screen, Card, Badge, Divider, Icon } from '@/components/ui';
+import { colors, spacing, radius } from '@/theme';
 import { useAuth } from '@/providers';
 import {
   fetchUserHabits,
@@ -11,33 +11,40 @@ import {
   type HabitRow,
 } from '@/lib/services/habits.service';
 import { fetchUserProfile, type ProfileRow } from '@/lib/services/profile.service';
+import { fetchWorkouts, type WorkoutRow } from '@/lib/services/workouts.service';
+import { fetchJournalEntries, type JournalEntryRow } from '@/lib/services/journal.service';
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { user, arcData, signOut } = useAuth();
+  const { user, arcData } = useAuth();
 
   const [habitsList, setHabitsList] = useState<HabitRow[]>([]);
   const [completedIds, setCompletedIds] = useState<string[]>([]);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
+  const [recentWorkouts, setRecentWorkouts] = useState<WorkoutRow[]>([]);
+  const [recentJournals, setRecentJournals] = useState<JournalEntryRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadDashboardData = useCallback(async () => {
     if (!user?.id) return;
     try {
-      setLoading(true);
-      const [fetchedProfile, fetchedHabits, todayCompleted] = await Promise.all([
+      const [fetchedProfile, fetchedHabits, todayCompleted, workouts, journals] = await Promise.all([
         fetchUserProfile(user.id),
         fetchUserHabits(user.id),
         fetchTodayCompletedHabitIds(user.id),
+        fetchWorkouts(user.id),
+        fetchJournalEntries(user.id),
       ]);
 
       setProfile(fetchedProfile);
       setCompletedIds(todayCompleted);
+      setRecentWorkouts(workouts);
+      setRecentJournals(journals);
 
       if (fetchedHabits && fetchedHabits.length > 0) {
         setHabitsList(fetchedHabits);
       } else if (arcData?.habits) {
-        // Fallback to onboarding arc habits
         setHabitsList(
           arcData.habits.map((h, i) => ({
             id: `temp_${i}`,
@@ -54,10 +61,16 @@ export default function DashboardScreen() {
       }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [user?.id, arcData]);
 
   useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
     loadDashboardData();
   }, [loadDashboardData]);
 
@@ -78,46 +91,45 @@ export default function DashboardScreen() {
   const progressPercent =
     habitsList.length > 0 ? Math.round((completedCount / habitsList.length) * 100) : 0;
 
-  const handleSignOut = async () => {
-    await signOut();
-    router.replace('/');
-  };
-
   const currentStreak = profile?.current_streak ?? 1;
   const totalDays = profile?.duration_days ?? arcData?.durationDays ?? 90;
   const goalTitle = profile?.goal ?? arcData?.goal ?? 'Peak Discipline & Body Transformation';
 
   return (
-    <Screen scroll edges={['top', 'bottom']}>
+    <Screen
+      scroll
+      edges={['top', 'bottom']}
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+    >
       {/* Top App Bar */}
       <View style={styles.header}>
         <View>
           <Text variant="caption" color="textMuted">
-            {user?.email ?? 'CHAMPION'}
+            {user?.email ?? 'WARRIOR'}
           </Text>
           <Text variant="title" weight="heavy">
             Winter<Text variant="title" weight="heavy" color="primary">ARC</Text>
           </Text>
         </View>
-        <Button
-          title="Sign Out"
-          variant="ghost"
-          size="sm"
-          onPress={handleSignOut}
-          style={styles.signOutBtn}
-        />
+        <Pressable
+          style={styles.profileBadgeBtn}
+          onPress={() => router.push('/profile' as any)}
+        >
+          <Badge label={`STREAK ${currentStreak}🔥`} tone="primary" />
+        </Pressable>
       </View>
 
       {/* Hero Streak & Progress Card */}
       <Card elevated style={styles.streakCard}>
         <View style={styles.streakRow}>
-          <View>
+          <View style={styles.streakInfo}>
             <Badge label={`DAY ${currentStreak} OF ${totalDays}`} tone="primary" />
             <Text variant="display" weight="heavy" style={styles.streakCount}>
               Day {currentStreak.toString().padStart(2, '0')}
             </Text>
             <Text variant="caption" color="textSecondary">
-              Streak: {currentStreak} Day 🔥 · {totalDays - currentStreak} Days Remaining
+              Active Streak: {currentStreak} Day 🔥 · {Math.max(0, totalDays - currentStreak)} Days To Go
             </Text>
           </View>
           <View style={styles.progressCircle}>
@@ -134,7 +146,7 @@ export default function DashboardScreen() {
 
         <View style={styles.missionRow}>
           <Text variant="caption" color="textMuted">
-            ACTIVE MISSION:
+            ACTIVE CONTRACT GOAL:
           </Text>
           <Text variant="bodySm" weight="semibold">
             {goalTitle}
@@ -142,13 +154,15 @@ export default function DashboardScreen() {
         </View>
       </Card>
 
-      {/* Today's Non-Negotiables Checklist */}
+      {/* Today's Protocol Checklist */}
       <View style={styles.sectionHeader}>
-        <Text variant="heading" weight="bold">
-          Today&apos;s Protocol
-        </Text>
+        <View style={styles.sectionTitleRow}>
+          <Text variant="heading" weight="bold">
+            Today&apos;s Protocol
+          </Text>
+        </View>
         <Badge
-          label={`${completedCount}/${habitsList.length} COMPLETED`}
+          label={`${completedCount}/${habitsList.length} DONE`}
           tone={progressPercent === 100 ? 'success' : 'neutral'}
         />
       </View>
@@ -156,88 +170,122 @@ export default function DashboardScreen() {
       <View style={styles.habitsList}>
         {loading && habitsList.length === 0 ? (
           <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.lg }} />
+        ) : habitsList.length === 0 ? (
+          <Card style={styles.emptyCard}>
+            <Text variant="body" color="textMuted" align="center">
+              No habits set yet for this Arc.
+            </Text>
+            <Pressable onPress={() => router.push('/habits' as any)}>
+              <Text variant="bodySm" color="primary" weight="bold" align="center" style={{ marginTop: spacing.sm }}>
+                + Add your first non-negotiable
+              </Text>
+            </Pressable>
+          </Card>
         ) : (
           habitsList.map((habit) => {
-          const isDone = completedIds.includes(habit.id);
-          return (
-            <Card
-              key={habit.id}
-              onPress={() => handleToggleHabit(habit.id)}
-              style={[
-                styles.habitCard,
-                isDone && styles.habitCardDone,
-              ]}
-            >
-              <View style={styles.habitCardContent}>
-                <View style={[styles.checkbox, isDone && styles.checkboxDone]}>
-                  {isDone && <Text style={styles.checkMark}>✓</Text>}
+            const isDone = completedIds.includes(habit.id);
+            return (
+              <Card
+                key={habit.id}
+                onPress={() => handleToggleHabit(habit.id)}
+                style={[
+                  styles.habitCard,
+                  isDone && styles.habitCardDone,
+                ]}
+              >
+                <View style={styles.habitCardContent}>
+                  <View style={[styles.checkbox, isDone && styles.checkboxDone]}>
+                    {isDone && <Icon name="check" size={14} color={colors.textInverse} strokeWidth={3} />}
+                  </View>
+                  <Text
+                    variant="body"
+                    weight={isDone ? 'regular' : 'semibold'}
+                    style={[
+                      styles.habitLabel,
+                      isDone && styles.habitLabelDone,
+                    ]}
+                  >
+                    {habit.title}
+                  </Text>
                 </View>
-                <Text
-                  variant="body"
-                  weight={isDone ? 'regular' : 'semibold'}
-                  style={[
-                    styles.habitLabel,
-                    isDone && styles.habitLabelDone,
-                  ]}
-                >
-                  {habit.title}
-                </Text>
-              </View>
-            </Card>
-          );
-        }))}
+              </Card>
+            );
+          })
+        )}
       </View>
 
-      {/* Pillars Quick View */}
+      {/* Arc Pillars Direct Navigation */}
       <View style={styles.sectionHeader}>
         <Text variant="heading" weight="bold">
-          Arc Pillars
+          The Three Pillars
         </Text>
         <Text variant="caption" color="textMuted">
-          Connected Backend
+          Tap to track
         </Text>
       </View>
 
       <View style={styles.pillarsGrid}>
-        <Card style={styles.pillarMiniCard}>
+        <Card
+          style={styles.pillarCard}
+          onPress={() => router.push('/workouts' as any)}
+        >
           <View style={[styles.miniDot, { backgroundColor: colors.fitness }]} />
-          <Text variant="bodySm" weight="semibold">
+          <Text variant="bodySm" weight="bold">
             Fitness
           </Text>
           <Text variant="caption" color="textMuted">
-            Workouts Table
+            {recentWorkouts.length} Logged
+          </Text>
+          <Text variant="caption" color="fitness" weight="semibold">
+            Track Workout →
           </Text>
         </Card>
 
-        <Card style={styles.pillarMiniCard}>
+        <Card
+          style={styles.pillarCard}
+          onPress={() => router.push('/habits' as any)}
+        >
           <View style={[styles.miniDot, { backgroundColor: colors.discipline }]} />
-          <Text variant="bodySm" weight="semibold">
+          <Text variant="bodySm" weight="bold">
             Habits
           </Text>
           <Text variant="caption" color="textMuted">
-            {progressPercent}% Logged
+            {progressPercent}% Today
+          </Text>
+          <Text variant="caption" color="primary" weight="semibold">
+            Manage List →
           </Text>
         </Card>
 
-        <Card style={styles.pillarMiniCard}>
+        <Card
+          style={styles.pillarCard}
+          onPress={() => router.push('/journal' as any)}
+        >
           <View style={[styles.miniDot, { backgroundColor: colors.mindfulness }]} />
-          <Text variant="bodySm" weight="semibold">
-            Journal
+          <Text variant="bodySm" weight="bold">
+            Mindset
           </Text>
           <Text variant="caption" color="textMuted">
-            Entries Table
+            {recentJournals.length} Reflections
+          </Text>
+          <Text variant="caption" color="mindfulness" weight="semibold">
+            Write Log →
           </Text>
         </Card>
       </View>
 
-      {/* Arc Reconfigure / Settings Link */}
-      <View style={styles.footer}>
-        <Pressable onPress={() => router.push('/onboarding')}>
-          <Text variant="caption" color="textMuted" align="center">
-            ⚙️ Reconfigure Arc Targets &amp; Habits
+      {/* Quick Insights Banner */}
+      <Card style={styles.insightBanner}>
+        <View style={styles.insightHeader}>
+          <Icon name="shield" size={16} color={colors.primary} />
+          <Text variant="bodySm" weight="bold" color="primary">
+            WINTER ARC DISCIPLINE
           </Text>
-        </Pressable>
-      </View>
+        </View>
+        <Text variant="caption" color="textSecondary" style={styles.insightText}>
+          &quot;The secret of change is to focus all of your energy not on fighting the old, but on building the new.&quot;
+        </Text>
+      </Card>
     </Screen>
   );
 }
@@ -250,9 +298,8 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
   },
-  signOutBtn: {
-    minWidth: 80,
-    height: 36,
+  profileBadgeBtn: {
+    padding: spacing.xs,
   },
   streakCard: {
     padding: spacing.xl,
@@ -264,13 +311,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  streakInfo: {
+    flex: 1,
+  },
   streakCount: {
     marginVertical: spacing.xs,
     letterSpacing: -1,
   },
   progressCircle: {
-    width: 84,
-    height: 84,
+    width: 80,
+    height: 80,
     borderRadius: radius.full,
     borderWidth: 3,
     borderColor: colors.primary,
@@ -287,9 +337,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.md,
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   habitsList: {
     gap: spacing.md,
     marginBottom: spacing.xl,
+  },
+  emptyCard: {
+    padding: spacing.xl,
+    alignItems: 'center',
   },
   habitCard: {
     padding: spacing.lg,
@@ -320,11 +379,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success,
     borderColor: colors.success,
   },
-  checkMark: {
-    color: colors.textInverse,
-    fontSize: 14,
-    fontWeight: fontWeight.bold,
-  },
   habitLabel: {
     flex: 1,
   },
@@ -337,19 +391,31 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.xl,
   },
-  pillarMiniCard: {
+  pillarCard: {
     flex: 1,
     padding: spacing.md,
     alignItems: 'center',
     gap: spacing.xs,
   },
   miniDot: {
-    width: 8,
-    height: 8,
+    width: 10,
+    height: 10,
     borderRadius: radius.full,
   },
-  footer: {
-    paddingVertical: spacing.xl,
+  insightBanner: {
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+    backgroundColor: colors.surfaceElevated,
+    borderColor: colors.borderSubtle,
+  },
+  insightHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  insightText: {
+    fontStyle: 'italic',
+    lineHeight: 18,
   },
 });
