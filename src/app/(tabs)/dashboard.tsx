@@ -18,6 +18,7 @@ import {
 import { colors, spacing, radius } from '@/theme';
 import { useAuth } from '@/providers';
 import { enqueueOfflineMutation } from '@/lib/services/sync.service';
+import { syncMyEp } from '@/lib/services/ep.service';
 import {
   fetchUserHabits,
   fetchTodayCompletedHabitIds,
@@ -111,6 +112,8 @@ export default function DashboardScreen() {
 
     try {
       await toggleHabitLog(user.id, habitId, nextState);
+      // Auto-recalculate server effort points in background
+      syncMyEp().catch(() => {});
     } catch {
       // Offline fallback: queue mutation for cloud re-sync
       await enqueueOfflineMutation('TOGGLE_HABIT', {
@@ -166,6 +169,13 @@ export default function DashboardScreen() {
         </View>
         <View style={styles.headerRightActions}>
           <SyncStatusBadge onSyncComplete={loadDashboardData} />
+          <Pressable
+            style={styles.bellBtn}
+            onPress={() => router.push('/leaderboard')}
+            hitSlop={8}
+          >
+            <Text style={{ fontSize: 13 }}>⚔️</Text>
+          </Pressable>
           <Pressable
             style={styles.bellBtn}
             onPress={() => setNotificationModalVisible(true)}

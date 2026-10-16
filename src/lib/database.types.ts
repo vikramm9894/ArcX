@@ -493,7 +493,45 @@ export interface Database {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      sync_my_ep: {
+        Args: {
+          p_day?: string;
+        };
+        Returns: Json;
+      };
+      choose_character: {
+        Args: {
+          p_character_key: string;
+        };
+        Returns: Json;
+      };
+      refresh_my_stats: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+      global_leaderboard: {
+        Args: {
+          p_limit?: number;
+        };
+        Returns: Json;
+      };
+      my_rank: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+      around_me: {
+        Args: {
+          p_n?: number;
+        };
+        Returns: Json;
+      };
+      respond_friend_request: {
+        Args: {
+          p_friendship_id: string;
+          p_accept: boolean;
+        };
+        Returns: undefined;
+      };
     };
     Enums: {
       [_ in never]: never;

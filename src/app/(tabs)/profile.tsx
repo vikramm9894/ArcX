@@ -363,6 +363,11 @@ export default function ProfileScreen() {
 
       <Card style={styles.actionsCard}>
         <Button
+          title="⚔️ Arc Arena &amp; Leaderboard"
+          variant="primary"
+          onPress={() => router.push('/leaderboard')}
+        />
+        <Button
           title="🏆 90-Day Arc Ascension &amp; Diploma"
           variant="primary"
           onPress={() => setAscensionModalVisible(true)}
