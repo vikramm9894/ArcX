@@ -26,6 +26,9 @@ export default function RootLayout() {
         <Stack.Screen name="sign-up" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+        <Stack.Screen name="character-select" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="leaderboard" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="battle/[id]" options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
       </Stack>
     </AppProviders>
   );

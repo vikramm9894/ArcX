@@ -112,13 +112,14 @@ export async function chooseCharacter(characterKey: CharacterKey): Promise<Playe
 /**
  * Fetch current user's arena player state
  */
-export async function fetchMyPlayerProfile(userId: string): Promise<PlayerProfile | null> {
-  if (isSupabaseConfigured) {
+export async function fetchMyPlayerProfile(userId?: string): Promise<PlayerProfile | null> {
+  const targetId = userId ?? (isSupabaseConfigured ? (await supabase.auth.getUser()).data.user?.id : 'guest_warrior');
+  if (isSupabaseConfigured && targetId) {
     try {
       const { data, error } = await supabase
         .from('players')
         .select('*, characters(name, archetype)')
-        .eq('user_id', userId)
+        .eq('user_id', targetId)
         .maybeSingle();
 
       if (!error && data) {
@@ -159,6 +160,8 @@ export async function fetchMyPlayerProfile(userId: string): Promise<PlayerProfil
 
   return null;
 }
+
+export const fetchMyPlayer = fetchMyPlayerProfile;
 
 /**
  * Trigger server recalculation of 7-day average stats

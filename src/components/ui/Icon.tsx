@@ -29,7 +29,8 @@ export type IconName =
   | 'share'
   | 'refresh-cw'
   | 'sun'
-  | 'moon';
+  | 'moon'
+  | 'swords';
 
 export interface IconProps {
   name: IconName;
@@ -226,6 +227,19 @@ export function Icon({
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
           <Path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+        </Svg>
+      );
+    case 'swords':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+          <Polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" />
+          <Line x1="13" y1="19" x2="19" y2="13" />
+          <Line x1="16" y1="16" x2="20" y2="20" />
+          <Line x1="19" y1="21" x2="21" y2="19" />
+          <Polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5" />
+          <Line x1="5" y1="14" x2="9" y2="18" />
+          <Line x1="7" y1="17" x2="3" y2="21" />
+          <Line x1="2" y1="19" x2="5" y2="22" />
         </Svg>
       );
     default:
