@@ -16,6 +16,7 @@ export interface Database {
           id: string;
           email: string | null;
           full_name: string | null;
+          username?: string | null;
           goal: string;
           focus_pillar: Pillar;
           start_date: string;
@@ -30,6 +31,7 @@ export interface Database {
           id: string;
           email?: string | null;
           full_name?: string | null;
+          username?: string | null;
           goal?: string;
           focus_pillar?: Pillar;
           start_date?: string;
@@ -44,6 +46,7 @@ export interface Database {
           id?: string;
           email?: string | null;
           full_name?: string | null;
+          username?: string | null;
           goal?: string;
           focus_pillar?: Pillar;
           start_date?: string;
@@ -267,6 +270,218 @@ export interface Database {
           {
             foreignKeyName: 'journal_entries_user_id_fkey';
             columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      app_config: {
+        Row: {
+          key: string;
+          value: Json;
+          updated_at: string;
+        };
+        Insert: {
+          key: string;
+          value: Json;
+          updated_at?: string;
+        };
+        Update: {
+          key?: string;
+          value?: Json;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      characters: {
+        Row: {
+          key: string;
+          name: string;
+          pillar: Pillar;
+          archetype: string;
+          bonus: Json;
+          forms: Json;
+          created_at: string;
+        };
+        Insert: {
+          key: string;
+          name: string;
+          pillar: Pillar;
+          archetype: string;
+          bonus: Json;
+          forms: Json;
+          created_at?: string;
+        };
+        Update: {
+          key?: string;
+          name?: string;
+          pillar?: Pillar;
+          archetype?: string;
+          bonus?: Json;
+          forms?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      players: {
+        Row: {
+          user_id: string;
+          character_key: string;
+          trophies: number;
+          wins: number;
+          losses: number;
+          energy: number;
+          shield_until: string | null;
+          atk: number;
+          def: number;
+          crit: number;
+          hp: number;
+          level: number;
+          lifetime_ep: number;
+          last_active_day: string;
+          is_bot: boolean;
+          hidden: boolean;
+          banned: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          character_key: string;
+          trophies?: number;
+          wins?: number;
+          losses?: number;
+          energy?: number;
+          shield_until?: string | null;
+          atk?: number;
+          def?: number;
+          crit?: number;
+          hp?: number;
+          level?: number;
+          lifetime_ep?: number;
+          last_active_day?: string;
+          is_bot?: boolean;
+          hidden?: boolean;
+          banned?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          character_key?: string;
+          trophies?: number;
+          wins?: number;
+          losses?: number;
+          energy?: number;
+          shield_until?: string | null;
+          atk?: number;
+          def?: number;
+          crit?: number;
+          hp?: number;
+          level?: number;
+          lifetime_ep?: number;
+          last_active_day?: string;
+          is_bot?: boolean;
+          hidden?: boolean;
+          banned?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'players_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: true;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'players_character_key_fkey';
+            columns: ['character_key'];
+            isOneToOne: false;
+            referencedRelation: 'characters';
+            referencedColumns: ['key'];
+          },
+        ];
+      };
+      ep_daily: {
+        Row: {
+          user_id: string;
+          day: string;
+          habit_ep: number;
+          workout_ep: number;
+          journal_ep: number;
+          total_ep: number;
+          energy_granted: number;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          day?: string;
+          habit_ep?: number;
+          workout_ep?: number;
+          journal_ep?: number;
+          total_ep?: number;
+          energy_granted?: number;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          day?: string;
+          habit_ep?: number;
+          workout_ep?: number;
+          journal_ep?: number;
+          total_ep?: number;
+          energy_granted?: number;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'ep_daily_user_id_fkey';
+            columns: ['user_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      friendships: {
+        Row: {
+          id: string;
+          requester_id: string;
+          addressee_id: string;
+          status: 'pending' | 'accepted' | 'rejected' | 'blocked';
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          requester_id: string;
+          addressee_id: string;
+          status?: 'pending' | 'accepted' | 'rejected' | 'blocked';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          requester_id?: string;
+          addressee_id?: string;
+          status?: 'pending' | 'accepted' | 'rejected' | 'blocked';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'friendships_requester_id_fkey';
+            columns: ['requester_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'friendships_addressee_id_fkey';
+            columns: ['addressee_id'];
             isOneToOne: false;
             referencedRelation: 'profiles';
             referencedColumns: ['id'];

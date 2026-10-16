@@ -9,3 +9,4 @@ export * from './backup.service';
 export * from './notifications.service';
 export * from './sync.service';
 export * from './ascension.service';
+export * from './arena-config.service';
