@@ -12,3 +12,4 @@ export * from './ascension.service';
 export * from './arena-config.service';
 export * from './ep.service';
 export * from './player.service';
+export * from './battle.service';

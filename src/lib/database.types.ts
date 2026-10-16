@@ -488,6 +488,69 @@ export interface Database {
           },
         ];
       };
+      battles: {
+        Row: {
+          id: string;
+          attacker_id: string;
+          defender_id: string;
+          season_id: string | null;
+          seed: number;
+          attacker_stats: Json;
+          defender_stats: Json;
+          events: Json;
+          winner_id: string;
+          attacker_delta: number;
+          defender_delta: number;
+          defender_seen: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          attacker_id: string;
+          defender_id: string;
+          season_id?: string | null;
+          seed: number;
+          attacker_stats: Json;
+          defender_stats: Json;
+          events: Json;
+          winner_id: string;
+          attacker_delta: number;
+          defender_delta: number;
+          defender_seen?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          attacker_id?: string;
+          defender_id?: string;
+          season_id?: string | null;
+          seed?: number;
+          attacker_stats?: Json;
+          defender_stats?: Json;
+          events?: Json;
+          winner_id?: string;
+          attacker_delta?: number;
+          defender_delta?: number;
+          defender_seen?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'battles_attacker_id_fkey';
+            columns: ['attacker_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'battles_defender_id_fkey';
+            columns: ['defender_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -529,6 +592,36 @@ export interface Database {
         Args: {
           p_friendship_id: string;
           p_accept: boolean;
+        };
+        Returns: undefined;
+      };
+      simulate_battle: {
+        Args: {
+          a_stats: Json;
+          d_stats: Json;
+          p_seed: number;
+        };
+        Returns: Json;
+      };
+      find_opponents: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+      attack: {
+        Args: {
+          p_defender: string;
+        };
+        Returns: Json;
+      };
+      my_battles: {
+        Args: {
+          p_limit?: number;
+        };
+        Returns: Json;
+      };
+      mark_battle_seen: {
+        Args: {
+          p_battle_id: string;
         };
         Returns: undefined;
       };
