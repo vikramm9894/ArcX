@@ -6,3 +6,6 @@ export * from './milestones.service';
 export * from './quotes.service';
 export * from './analytics.service';
 export * from './backup.service';
+export * from './notifications.service';
+export * from './sync.service';
+export * from './ascension.service';

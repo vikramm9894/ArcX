@@ -11,3 +11,6 @@ export { ProtocolTimerModal, type ProtocolTimerModalProps, type TimerMode } from
 export { ShareContractModal, type ShareContractModalProps } from './ShareContractModal';
 export { PillarBalanceCard, type PillarBalanceCardProps } from './PillarBalanceCard';
 export { BackupModal, type BackupModalProps } from './BackupModal';
+export { NotificationModal } from './NotificationModal';
+export { SyncStatusBadge } from './SyncStatusBadge';
+export { AscensionModal } from './AscensionModal';

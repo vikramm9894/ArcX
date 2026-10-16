@@ -21,7 +21,15 @@ export type IconName =
   | 'arrow-right'
   | 'chevron-right'
   | 'star'
-  | 'settings';
+  | 'settings'
+  | 'bell'
+  | 'cloud'
+  | 'cloud-off'
+  | 'award'
+  | 'share'
+  | 'refresh-cw'
+  | 'sun'
+  | 'moon';
 
 export interface IconProps {
   name: IconName;
@@ -153,6 +161,71 @@ export function Icon({
         <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
           <Circle cx="12" cy="12" r="3" />
           <Path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+        </Svg>
+      );
+    case 'bell':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <Path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </Svg>
+      );
+    case 'cloud':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+        </Svg>
+      );
+    case 'cloud-off':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M22.61 16.95A5 5 0 0 0 18 10h-1.26a8 8 0 0 0-7.05-6M5 5a8 8 0 0 0 4 7h-1a5 5 0 0 0 0 10h11" />
+          <Line x1="1" y1="1" x2="23" y2="23" />
+        </Svg>
+      );
+    case 'award':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+          <Circle cx="12" cy="8" r="7" />
+          <Polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" />
+        </Svg>
+      );
+    case 'share':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+          <Circle cx="18" cy="5" r="3" />
+          <Circle cx="6" cy="12" r="3" />
+          <Circle cx="18" cy="19" r="3" />
+          <Line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+          <Line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+        </Svg>
+      );
+    case 'refresh-cw':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+          <Polyline points="23 4 23 10 17 10" />
+          <Polyline points="1 20 1 14 7 14" />
+          <Path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+        </Svg>
+      );
+    case 'sun':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+          <Circle cx="12" cy="12" r="5" />
+          <Line x1="12" y1="1" x2="12" y2="3" />
+          <Line x1="12" y1="21" x2="12" y2="23" />
+          <Line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+          <Line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+          <Line x1="1" y1="12" x2="3" y2="12" />
+          <Line x1="21" y1="12" x2="23" y2="12" />
+          <Line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+          <Line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+        </Svg>
+      );
+    case 'moon':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
         </Svg>
       );
     default:

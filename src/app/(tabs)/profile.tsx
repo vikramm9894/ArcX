@@ -13,6 +13,9 @@ import {
   ShareContractModal,
   PillarBalanceCard,
   BackupModal,
+  NotificationModal,
+  SyncStatusBadge,
+  AscensionModal,
 } from '@/components/ui';
 import { colors, spacing, radius } from '@/theme';
 import { useAuth } from '@/providers';
@@ -36,6 +39,8 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const [backupModalVisible, setBackupModalVisible] = useState(false);
+  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+  const [ascensionModalVisible, setAscensionModalVisible] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!user?.id) return;
@@ -141,10 +146,13 @@ export default function ProfileScreen() {
             Arc<Text variant="title" weight="heavy" color="primary">PROFILE</Text>
           </Text>
         </View>
-        <Badge
-          label={isSupabaseConfigured ? 'CLOUD SYNC' : 'LOCAL MODE'}
-          tone={isSupabaseConfigured ? 'primary' : 'neutral'}
-        />
+        <View style={styles.headerRightRow}>
+          <SyncStatusBadge onSyncComplete={loadData} />
+          <Badge
+            label={isSupabaseConfigured ? 'CLOUD SYNC' : 'LOCAL MODE'}
+            tone={isSupabaseConfigured ? 'primary' : 'neutral'}
+          />
+        </View>
       </View>
 
       {/* User Hero Card */}
@@ -355,8 +363,18 @@ export default function ProfileScreen() {
 
       <Card style={styles.actionsCard}>
         <Button
-          title="📄 View &amp; Export Arc Passport"
+          title="🏆 90-Day Arc Ascension &amp; Diploma"
           variant="primary"
+          onPress={() => setAscensionModalVisible(true)}
+        />
+        <Button
+          title="🔔 Daily Arc Alerts &amp; Notifications"
+          variant="secondary"
+          onPress={() => setNotificationModalVisible(true)}
+        />
+        <Button
+          title="📄 View &amp; Export Arc Passport"
+          variant="secondary"
           onPress={() => setShareModalVisible(true)}
         />
         <Button
@@ -408,6 +426,29 @@ export default function ProfileScreen() {
         userId={user?.id ?? 'guest'}
         onDataRestored={loadData}
       />
+
+      {/* Phase 7: Notification Reminders Modal */}
+      <NotificationModal
+        visible={notificationModalVisible}
+        onClose={() => setNotificationModalVisible(false)}
+      />
+
+      {/* Phase 7: 90-Day Arc Ascension Certificate Modal */}
+      <AscensionModal
+        visible={ascensionModalVisible}
+        onClose={() => setAscensionModalVisible(false)}
+        evaluationInput={{
+          userName: profile?.full_name ?? user?.email ?? 'Champion',
+          currentStreak: streak,
+          longestStreak,
+          totalDays: duration,
+          disciplineScore: pillarAnalytics.disciplineIndex,
+          totalWorkouts: workouts.length,
+          totalHabitsLogged: habitCount > 0 ? Math.round(habitCount * streak * 0.9) : 45,
+          totalReflections: journals.length,
+          goal,
+        }}
+      />
     </Screen>
   );
 }
@@ -419,6 +460,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
+  },
+  headerRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   userCard: {
     padding: spacing.lg,

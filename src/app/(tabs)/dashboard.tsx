@@ -10,10 +10,14 @@ import {
   Icon,
   ProtocolTimerModal,
   ShareContractModal,
+  NotificationModal,
+  SyncStatusBadge,
+  AscensionModal,
   type TimerMode,
 } from '@/components/ui';
 import { colors, spacing, radius } from '@/theme';
 import { useAuth } from '@/providers';
+import { enqueueOfflineMutation } from '@/lib/services/sync.service';
 import {
   fetchUserHabits,
   fetchTodayCompletedHabitIds,
@@ -39,10 +43,12 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Phase 5: Timer & Share Modals
+  // Phase 5 & 7: Modals & Protocol Engines
   const [timerModalVisible, setTimerModalVisible] = useState(false);
   const [activeTimerMode, setActiveTimerMode] = useState<TimerMode>('cold');
   const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+  const [ascensionModalVisible, setAscensionModalVisible] = useState(false);
   const [dailyCreed, setDailyCreed] = useState<StoicQuote>(() => getDailyCreed());
 
   const loadDashboardData = useCallback(async () => {
@@ -103,7 +109,17 @@ export default function DashboardScreen() {
       nextState ? [...prev, habitId] : prev.filter((id) => id !== habitId),
     );
 
-    await toggleHabitLog(user.id, habitId, nextState);
+    try {
+      await toggleHabitLog(user.id, habitId, nextState);
+    } catch {
+      // Offline fallback: queue mutation for cloud re-sync
+      await enqueueOfflineMutation('TOGGLE_HABIT', {
+        habitId,
+        userId: user.id,
+        date: new Date().toISOString().split('T')[0],
+        completed: nextState,
+      });
+    }
   };
 
   const completedCount = habitsList.filter((h) => completedIds.includes(h.id)).length;
@@ -148,15 +164,25 @@ export default function DashboardScreen() {
             Winter<Text variant="title" weight="heavy" color="primary">ARC</Text>
           </Text>
         </View>
-        <Pressable
-          style={styles.profileBadgeBtn}
-          onPress={() => router.push('/profile' as any)}
-        >
-          <View style={styles.headerBadgesRow}>
-            <Badge label={`INDEX ${pillarAnalytics.disciplineIndex}`} tone="primary" />
-            <Badge label={`STREAK ${currentStreak}🔥`} tone="warning" />
-          </View>
-        </Pressable>
+        <View style={styles.headerRightActions}>
+          <SyncStatusBadge onSyncComplete={loadDashboardData} />
+          <Pressable
+            style={styles.bellBtn}
+            onPress={() => setNotificationModalVisible(true)}
+            hitSlop={8}
+          >
+            <Icon name="bell" size={18} color={colors.primary} />
+          </Pressable>
+          <Pressable
+            style={styles.profileBadgeBtn}
+            onPress={() => router.push('/profile' as any)}
+          >
+            <View style={styles.headerBadgesRow}>
+              <Badge label={`INDEX ${pillarAnalytics.disciplineIndex}`} tone="primary" />
+              <Badge label={`STREAK ${currentStreak}🔥`} tone="warning" />
+            </View>
+          </Pressable>
+        </View>
       </View>
 
       {/* Hero Streak & Progress Card */}
@@ -426,6 +452,28 @@ export default function DashboardScreen() {
         reflectionsCount={recentJournals.length}
         unlockedBadgesCount={Math.min(9, Math.max(1, currentStreak))}
       />
+
+      {/* Phase 7: Notifications & Ascension Modals */}
+      <NotificationModal
+        visible={notificationModalVisible}
+        onClose={() => setNotificationModalVisible(false)}
+      />
+
+      <AscensionModal
+        visible={ascensionModalVisible}
+        onClose={() => setAscensionModalVisible(false)}
+        evaluationInput={{
+          userName: profile?.full_name ?? user?.email ?? 'Warrior',
+          currentStreak,
+          longestStreak: currentStreak,
+          totalDays,
+          disciplineScore: pillarAnalytics.disciplineIndex,
+          totalWorkouts: recentWorkouts.length,
+          totalHabitsLogged: completedCount,
+          totalReflections: recentJournals.length,
+          goal: goalTitle,
+        }}
+      />
     </Screen>
   );
 }
@@ -437,6 +485,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  bellBtn: {
+    padding: spacing.xs,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   profileBadgeBtn: {
     padding: spacing.xs,
