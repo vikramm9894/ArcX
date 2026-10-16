@@ -6,6 +6,7 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Text, Screen, Card, Badge } from '@/components/ui';
 import { colors, spacing, radius } from '@/theme';
@@ -17,6 +18,12 @@ import {
   type LeaderboardEntry,
   type MyRankResult,
 } from '@/lib/services/player.service';
+import {
+  reportPlayer,
+  blockPlayer,
+  getLocalBlockedUsers,
+  setLeaderboardVisibility,
+} from '@/lib/services/moderation.service';
 
 type LeaderboardTab = 'global' | 'around';
 
@@ -28,17 +35,24 @@ export default function LeaderboardScreen() {
   const [aroundList, setAroundList] = useState<LeaderboardEntry[]>([]);
   const [myRank, setMyRank] = useState<MyRankResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isIncognito, setIsIncognito] = useState(false);
 
   const loadLeaderboard = useCallback(async () => {
     try {
-      const [topData, myRankData, nearData] = await Promise.all([
+      const [topData, myRankData, nearData, blockedUsers] = await Promise.all([
         fetchGlobalLeaderboard(50),
         fetchMyRank(),
         fetchAroundMe(3),
+        getLocalBlockedUsers(),
       ]);
-      setGlobalList(topData);
+
+      // Filter out locally blocked users
+      const cleanTop = topData.filter((p) => !blockedUsers.includes(p.userId));
+      const cleanNear = nearData.filter((p) => !blockedUsers.includes(p.userId));
+
+      setGlobalList(cleanTop);
       setMyRank(myRankData);
-      setAroundList(nearData.length > 0 ? nearData : topData.slice(0, 7));
+      setAroundList(cleanNear.length > 0 ? cleanNear : cleanTop.slice(0, 7));
     } finally {
       setLoading(false);
     }
@@ -72,6 +86,90 @@ export default function LeaderboardScreen() {
     return '⚔️';
   };
 
+  const handleToggleIncognito = async () => {
+    const nextState = !isIncognito;
+    setIsIncognito(nextState);
+    await setLeaderboardVisibility(nextState);
+    Alert.alert(
+      nextState ? '🛡️ Incognito Enabled' : '👁️ Leaderboard Visible',
+      nextState
+        ? 'Your profile is now hidden from public leaderboards. Your personal ranking is still tracked privately.'
+        : 'Your profile is now visible on public leaderboards.'
+    );
+  };
+
+  const handlePlayerOptions = (target: LeaderboardEntry) => {
+    if (target.isCurrentUser || target.userId === user?.id) return;
+
+    Alert.alert(
+      `Player Safety: ${target.displayName}`,
+      'Choose an action for this user:',
+      [
+        {
+          text: 'Report Player',
+          onPress: () => handleReportFlow(target),
+        },
+        {
+          text: 'Block Player',
+          style: 'destructive',
+          onPress: () => handleBlockFlow(target),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const handleReportFlow = (target: LeaderboardEntry) => {
+    Alert.alert(
+      `Report ${target.displayName}`,
+      'Select a reason for the report:',
+      [
+        {
+          text: 'Inappropriate Username',
+          onPress: async () => {
+            await reportPlayer(target.userId, 'Inappropriate Username');
+            Alert.alert('Report Received', 'Thank you. Our moderation team will review this user.');
+          },
+        },
+        {
+          text: 'Suspicious / Cheating',
+          onPress: async () => {
+            await reportPlayer(target.userId, 'Suspicious Activity / Cheating');
+            Alert.alert('Report Received', 'Thank you. Our automated anti-cheat team will inspect this profile.');
+          },
+        },
+        {
+          text: 'Harassment',
+          onPress: async () => {
+            await reportPlayer(target.userId, 'Harassment / Offensive Behavior');
+            Alert.alert('Report Received', 'Thank you. We maintain zero tolerance for harassment.');
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const handleBlockFlow = (target: LeaderboardEntry) => {
+    Alert.alert(
+      `Block ${target.displayName}?`,
+      'You will no longer see this player in Matchmaking, Battle logs, or Leaderboards. They will not be able to challenge you.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block User',
+          style: 'destructive',
+          onPress: async () => {
+            await blockPlayer(target.userId);
+            setGlobalList((prev) => prev.filter((p) => p.userId !== target.userId));
+            setAroundList((prev) => prev.filter((p) => p.userId !== target.userId));
+            Alert.alert('Player Blocked', `${target.displayName} has been blocked.`);
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <Screen scroll={false} edges={['top', 'bottom']}>
       {/* Header */}
@@ -82,13 +180,20 @@ export default function LeaderboardScreen() {
               ← Back
             </Text>
           </Pressable>
-          <Pressable onPress={() => router.push('/character-select')} hitSlop={12}>
-            <Badge label="CHAMPION SELECT ⚔️" tone="primary" />
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: spacing.xs, alignItems: 'center' }}>
+            <Pressable onPress={handleToggleIncognito} hitSlop={8} style={styles.incognitoButton}>
+              <Text variant="caption" style={{ color: isIncognito ? colors.accent : colors.textMuted }}>
+                {isIncognito ? '🛡️ Incognito ON' : '👁️ Public'}
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => router.push('/character-select')} hitSlop={12}>
+              <Badge label="CHAMPION ⚔️" tone="primary" />
+            </Pressable>
+          </View>
         </View>
 
         <Text variant="caption" color="textMuted" style={{ marginTop: spacing.xs }}>
-          WINTER ARC ARENA
+          WINTER ARC ARENA · SEASON 1
         </Text>
         <Text variant="title" weight="heavy">
           Global <Text variant="title" weight="heavy" color="primary">LEADERBOARD</Text>
@@ -118,14 +223,19 @@ export default function LeaderboardScreen() {
             weight="bold"
             color={tab === 'around' ? 'textPrimary' : 'textMuted'}
           >
-            📍 Around My Rank
+            ⚡ In My Orbit
           </Text>
         </Pressable>
       </View>
 
-      {/* List Content */}
+      {/* Content */}
       {loading ? (
-        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl, flex: 1 }} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text variant="caption" color="textMuted" style={{ marginTop: spacing.md }}>
+            Calculating Global ELO Standings...
+          </Text>
+        </View>
       ) : (
         <ScrollView style={styles.listContainer} showsVerticalScrollIndicator={false}>
           {activeList.map((player) => {
@@ -139,6 +249,7 @@ export default function LeaderboardScreen() {
                   styles.playerCard,
                   isMe && styles.myPlayerCard,
                 ]}
+                onPress={() => !isMe && handlePlayerOptions(player)}
               >
                 <View style={styles.rankCol}>
                   <Badge
@@ -172,6 +283,12 @@ export default function LeaderboardScreen() {
                     {league.name}
                   </Text>
                 </View>
+
+                {!isMe && (
+                  <View style={styles.moreIconWrapper}>
+                    <Text variant="caption" color="textMuted">•••</Text>
+                  </View>
+                )}
               </Card>
             );
           })}
@@ -188,14 +305,18 @@ export default function LeaderboardScreen() {
                 YOUR ARENA RANK
               </Text>
               <Text variant="heading" weight="heavy" color="primary">
-                Rank #{myRank.rank}{' '}
-                <Text variant="caption" color="textSecondary">
+                #{myRank.rank}{' '}
+                <Text variant="caption" color="textMuted">
                   of {myRank.totalPlayers} (Top {myRank.percentile}%)
                 </Text>
               </Text>
             </View>
-            <View style={styles.stickyRight}>
-              <Text variant="title" weight="heavy">
+
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text variant="caption" color="textMuted">
+                RATING
+              </Text>
+              <Text variant="heading" weight="heavy" style={{ color: '#FBBF24' }}>
                 🏆 {myRank.trophies}
               </Text>
             </View>
@@ -216,6 +337,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.xs,
+  },
+  incognitoButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -262,33 +391,42 @@ const styles = StyleSheet.create({
   },
   infoCol: {
     flex: 1,
-    gap: 2,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: spacing.xs,
   },
   trophiesCol: {
     alignItems: 'flex-end',
-    gap: 2,
+  },
+  moreIconWrapper: {
+    paddingLeft: spacing.xs,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   stickyBottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.backgroundElevated,
+    backgroundColor: colors.surfaceElevated,
     borderTopWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
+    borderTopColor: colors.borderSubtle,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   stickyRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  stickyRight: {
-    alignItems: 'flex-end',
   },
 });

@@ -551,6 +551,111 @@ export interface Database {
           },
         ];
       };
+      seasons: {
+        Row: {
+          id: string;
+          season_number: number;
+          name: string;
+          starts_at: string;
+          ends_at: string;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          season_number?: number;
+          name: string;
+          starts_at?: string;
+          ends_at?: string;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          season_number?: number;
+          name?: string;
+          starts_at?: string;
+          ends_at?: string;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      season_results: {
+        Row: {
+          id: string;
+          season_id: string;
+          user_id: string;
+          final_rating: number;
+          final_rank: number;
+          badge: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          season_id: string;
+          user_id: string;
+          final_rating: number;
+          final_rank: number;
+          badge: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          season_id?: string;
+          user_id?: string;
+          final_rating?: number;
+          final_rank?: number;
+          badge?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      reports: {
+        Row: {
+          id: string;
+          reporter_id: string;
+          target_id: string;
+          reason: string;
+          status: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          reporter_id: string;
+          target_id: string;
+          reason: string;
+          status?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          reporter_id?: string;
+          target_id?: string;
+          reason?: string;
+          status?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      blocks: {
+        Row: {
+          blocker_id: string;
+          blocked_id: string;
+          created_at: string;
+        };
+        Insert: {
+          blocker_id: string;
+          blocked_id: string;
+          created_at?: string;
+        };
+        Update: {
+          blocker_id?: string;
+          blocked_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -624,6 +729,39 @@ export interface Database {
           p_battle_id: string;
         };
         Returns: undefined;
+      };
+      report_player: {
+        Args: {
+          p_target: string;
+          p_reason: string;
+        };
+        Returns: boolean;
+      };
+      block_player: {
+        Args: {
+          p_target: string;
+        };
+        Returns: boolean;
+      };
+      unblock_player: {
+        Args: {
+          p_target: string;
+        };
+        Returns: boolean;
+      };
+      set_leaderboard_visibility: {
+        Args: {
+          p_hide: boolean;
+        };
+        Returns: boolean;
+      };
+      rollover_season: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+      my_season_history: {
+        Args: Record<string, never>;
+        Returns: Json;
       };
     };
     Enums: {

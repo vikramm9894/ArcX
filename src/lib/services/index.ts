@@ -13,3 +13,6 @@ export * from './arena-config.service';
 export * from './ep.service';
 export * from './player.service';
 export * from './battle.service';
+export * from './moderation.service';
+export * from './season.service';
+export * from './offline-queue.service';

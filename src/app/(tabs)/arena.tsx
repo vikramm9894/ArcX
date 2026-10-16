@@ -27,6 +27,20 @@ import {
   type BattleHistoryItem,
 } from '@/lib/services/battle.service';
 import { syncMyEp } from '@/lib/services/ep.service';
+import {
+  reportPlayer,
+  blockPlayer,
+  getLocalBlockedUsers,
+} from '@/lib/services/moderation.service';
+import {
+  fetchActiveSeason,
+  type SeasonInfo,
+} from '@/lib/services/season.service';
+import {
+  isNetworkOnline,
+  enqueueOfflineEpSync,
+  flushOfflineQueue,
+} from '@/lib/services/offline-queue.service';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 type ArenaSubTab = 'matchmaking' | 'history';
@@ -36,6 +50,7 @@ export default function ArenaScreen() {
   const { user } = useAuth();
 
   const [player, setPlayer] = useState<PlayerProfile | null>(null);
+  const [season, setSeason] = useState<SeasonInfo | null>(null);
   const [opponents, setOpponents] = useState<OpponentCandidate[]>([]);
   const [history, setHistory] = useState<BattleHistoryItem[]>([]);
   const [subTab, setSubTab] = useState<ArenaSubTab>('matchmaking');
@@ -47,13 +62,18 @@ export default function ArenaScreen() {
   // Load arena data
   const loadArenaData = useCallback(async () => {
     try {
-      const [playerData, oppList, battleLog] = await Promise.all([
+      const [playerData, oppList, battleLog, seasonData, blockedIds] = await Promise.all([
         fetchMyPlayer(),
         fetchOpponents(),
         fetchMyBattles(15),
+        fetchActiveSeason(),
+        getLocalBlockedUsers(),
       ]);
+
       setPlayer(playerData);
-      setOpponents(oppList);
+      setSeason(seasonData);
+      // Filter out locally blocked users
+      setOpponents(oppList.filter((opp) => !blockedIds.includes(opp.userId)));
       setHistory(battleLog);
     } catch (err) {
       console.warn('[ArenaScreen] Load error:', err);
@@ -67,14 +87,17 @@ export default function ArenaScreen() {
     let active = true;
     async function init() {
       try {
-        const [playerData, oppList, battleLog] = await Promise.all([
+        const [playerData, oppList, battleLog, seasonData, blockedIds] = await Promise.all([
           fetchMyPlayer(),
           fetchOpponents(),
           fetchMyBattles(15),
+          fetchActiveSeason(),
+          getLocalBlockedUsers(),
         ]);
         if (active) {
           setPlayer(playerData);
-          setOpponents(oppList);
+          setSeason(seasonData);
+          setOpponents(oppList.filter((opp) => !blockedIds.includes(opp.userId)));
           setHistory(battleLog);
         }
       } catch (err) {
@@ -123,20 +146,34 @@ export default function ArenaScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    await flushOfflineQueue();
     await loadArenaData();
   };
 
   const handleSyncDiscipline = async () => {
     setSyncingDiscipline(true);
     try {
-      await syncMyEp();
-      await refreshMyStats();
-      const updated = await fetchMyPlayer();
-      setPlayer(updated);
-      Alert.alert(
-        '⚔️ Discipline Synced',
-        'Your daily workout volume, habits, and journal reflections have been converted to combat stats and energy.'
-      );
+      const online = await isNetworkOnline();
+      const today = new Date().toISOString().split('T')[0];
+
+      if (!online) {
+        // Enqueue offline sync
+        await enqueueOfflineEpSync(today);
+        Alert.alert(
+          '⚡ Offline Queue Stored',
+          'Your discipline log has been saved locally. It will automatically synchronize with the server once an internet connection is detected.'
+        );
+      } else {
+        await flushOfflineQueue();
+        await syncMyEp();
+        await refreshMyStats();
+        const updated = await fetchMyPlayer();
+        setPlayer(updated);
+        Alert.alert(
+          '⚔️ Discipline Synced',
+          'Your daily workout volume, habits, and journal reflections have been converted to combat stats and energy.'
+        );
+      }
     } catch {
       Alert.alert('Sync Notice', 'Discipline updated with current local data.');
     } finally {
@@ -171,6 +208,77 @@ export default function ArenaScreen() {
     } finally {
       setAttackingTargetId(null);
     }
+  };
+
+  const handleOpponentOptions = (opp: OpponentCandidate) => {
+    if (opp.isBot) return;
+
+    Alert.alert(
+      `Player Safety: ${opp.displayName}`,
+      'Choose an action for this user:',
+      [
+        {
+          text: 'Report Player',
+          onPress: () => handleReportFlow(opp),
+        },
+        {
+          text: 'Block Player',
+          style: 'destructive',
+          onPress: () => handleBlockFlow(opp),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const handleReportFlow = (opp: OpponentCandidate) => {
+    Alert.alert(
+      `Report ${opp.displayName}`,
+      'Select a reason for the report (Apple UGC Safety 1.2):',
+      [
+        {
+          text: 'Inappropriate Username',
+          onPress: async () => {
+            await reportPlayer(opp.userId, 'Inappropriate Username');
+            Alert.alert('Report Received', 'Thank you. Our moderation team will review this user.');
+          },
+        },
+        {
+          text: 'Suspicious / Cheating',
+          onPress: async () => {
+            await reportPlayer(opp.userId, 'Suspicious Activity / Cheating');
+            Alert.alert('Report Received', 'Thank you. Anti-cheat team will inspect this profile.');
+          },
+        },
+        {
+          text: 'Harassment',
+          onPress: async () => {
+            await reportPlayer(opp.userId, 'Harassment / Offensive Behavior');
+            Alert.alert('Report Received', 'Thank you. We maintain zero tolerance for harassment.');
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const handleBlockFlow = (opp: OpponentCandidate) => {
+    Alert.alert(
+      `Block ${opp.displayName}?`,
+      'This user will never appear in your matchmaking or leaderboards. They will not be able to attack you.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block User',
+          style: 'destructive',
+          onPress: async () => {
+            await blockPlayer(opp.userId);
+            setOpponents((prev) => prev.filter((c) => c.userId !== opp.userId));
+            Alert.alert('Player Blocked', `${opp.displayName} has been blocked.`);
+          },
+        },
+      ]
+    );
   };
 
   const handleDismissDefenseAlert = async (battleId: string) => {
@@ -252,7 +360,10 @@ export default function ArenaScreen() {
         <View>
           <View style={styles.brandRow}>
             <Text style={styles.brandTitle}>ARCX ARENA</Text>
-            <Badge label="SEASON 1" tone="primary" />
+            <Badge
+              label={season ? `${season.name.toUpperCase()} · ${season.daysRemaining}D LEFT` : 'SEASON 1'}
+              tone="primary"
+            />
           </View>
           <Text variant="caption" muted>
             REAL EFFORT = BATTLE POWER
@@ -502,7 +613,7 @@ export default function ArenaScreen() {
                   No Opponents Found
                 </Text>
                 <Text variant="caption" muted style={{ textAlign: 'center', marginTop: 4 }}>
-                  All candidates in your tier are shielded or on cooldown. Pull to refresh!
+                  All candidates in your tier are shielded, on cooldown, or blocked. Pull to refresh!
                 </Text>
               </Card>
             ) : (
@@ -535,7 +646,7 @@ export default function ArenaScreen() {
                       </View>
                     </View>
 
-                    {/* Attack Action */}
+                    {/* Attack Action & Moderation */}
                     <View style={styles.opponentRight}>
                       <Button
                         title={
@@ -552,6 +663,15 @@ export default function ArenaScreen() {
                         disabled={!canAttack}
                         onPress={() => handleAttack(opp)}
                       />
+                      {!opp.isBot && (
+                        <Pressable
+                          style={styles.moreOppButton}
+                          onPress={() => handleOpponentOptions(opp)}
+                          hitSlop={8}
+                        >
+                          <Text variant="caption" muted>•••</Text>
+                        </Pressable>
+                      )}
                     </View>
                   </Card>
                 );
@@ -946,7 +1066,16 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   opponentRight: {
-    minWidth: 110,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    minWidth: 130,
+    justifyContent: 'flex-end',
+  },
+  moreOppButton: {
+    padding: 6,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceElevated,
   },
   historyList: {
     gap: spacing.sm,
